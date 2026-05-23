@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block title %}Order {{ order.external_order_id or order.id }} - RetroMonkey{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Order {{ order.external_order_id or order.id }}</h1>
+    <a href="{{ url_for('pages.order_list') }}" class="btn btn-secondary">&larr; All Orders</a>
+</div>
+
+<!-- Status Workflow -->
+<div class="status-workflow">
+    <span class="status-step {{ 'completed' if order.status in ['shipped','delivered'] else ('current' if order.status == 'pending' else '') }}">Pending</span>
+    <span class="status-connector"></span>
+    <span class="status-step {{ 'completed' if order.status == 'delivered' else ('current' if order.status == 'shipped' else '') }}">Shipped</span>
+    <span class="status-connector"></span>
+    <span class="status-step {{ 'current' if order.status == 'delivered' else '' }}">Delivered</span>
+</div>
+
+<!-- Order Info + Shipment -->
+<div class="detail-grid">
+    <div class="detail-section">
+        <h3>Buyer Information</h3>
+        <dl class="detail-fields">
+            <dt>Name</dt>
+            <dd>{{ order.buyer_name or '-' }}</dd>
+
+            <dt>Email</dt>
+            <dd>{{ order.buyer_email or '-' }}</dd>
+
+            <dt>Marketplace</dt>
+            <dd>{{ order.marketplace.name if order.marketplace else '-' }}</dd>
+
+            <dt>Order Date</dt>
+            <dd>{{ order.ordered_at.strftime('%b %d, %Y %H:%M') if order.ordered_at else '-' }}</dd>
+
+            <dt>Currency</dt>
+            <dd>{{ order.currency }}</dd>
+
+            <dt>Status</dt>
+            <dd><span class="badge-status badge-{{ order.status }}">{{ order.status }}</span></dd>
+        </dl>
+    </div>
+
+    <div class="detail-section">
+        <h3>Shipment</h3>
+        {% if order.shipments and order.shipments | length > 0 %}
+            {% set ship = order.shipments[0] %}
+            <dl class="detail-fields">
+                <dt>Carrier</dt>
+                <dd>{{ ship.carrier or '-' }}</dd>
+
+                <dt>Tracking</dt>
+                <dd>{{ ship.tracking_number or '-' }}</dd>
+
+                <dt>Shipped At</dt>
+                <dd>{{ ship.shipped_at.strftime('%b %d, %Y') if ship.shipped_at else '-' }}</dd>
+
+                <dt>Delivered At</dt>
+                <dd>{{ ship.delivered_at.strftime('%b %d, %Y') if ship.delivered_at else '-' }}</dd>
+            </dl>
+        {% else %}
+            <p class="text-muted">Not yet shipped.</p>
+        {% endif %}
+
+        {% if order.status == 'pending' %}
+        <hr style="border:none;border-top:1px solid var(--border);margin:16px 0;">
+        <h4 style="font-size:13px;font-weight:600;margin-bottom:12px;">Ship This Order</h4>
+        <form id="ship-form" class="form-group" style="margin:0;">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Carrier</label>
+                    <select name="carrier" id="ship-carrier">
+                        <option value="Australia Post">Australia Post</option>
+                        <option value="Sendle">Sendle</option>
+                        <option value="StarTrack">StarTrack</option>
+                        <option value="CouriersPlease">CouriersPlease</option>
+                        <option value="DHL">DHL</option>
+                        <option value="FedEx">FedEx</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Tracking Number</label>
+                    <input type="text" name="tracking_number" id="ship-tracking" placeholder="Enter tracking number" required>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm mt-1">Mark as Shipped</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Items Table -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h3>Items</h3>
+    </div>
+    <div class="card-body" style="padding:0;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Quantity</th>
+                    <th>Unit Price</th>
+                    <th>Subtotal</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in order.items %}
+                <tr>
+                    <td><a href="{{ url_for('pages.product_detail', product_id=item.product_id) }}">{{ item.product.title if item.product else 'Product #' + item.product_id|string }}</a></td>
+                    <td>{{ item.quantity }}</td>
+                    <td>${{ "%.2f" | format(item.unit_price) }}</td>
+                    <td>${{ "%.2f" | format(item.subtotal) }}</td>
+                </tr>
+                {% endfor %}
+                <tr style="font-weight:700;">
+                    <td colspan="3" class="text-right">Total</td>
+                    <td>${{ "%.2f" | format(order.total or 0) }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Fee Breakdown + Profit -->
+<div class="detail-grid">
+    <div class="detail-section">
+        <h3>Fee Breakdown</h3>
+        <dl class="detail-fields">
+            {% set total_fees = namespace(value=0) %}
+            {% for fee in order.transactions if fee.type == 'fee' %}
+                <dt>{{ fee.description or fee.type }}</dt>
+                <dd class="text-danger">-${{ "%.2f" | format(fee.amount) }}</dd>
+                {% set total_fees.value = total_fees.value + fee.amount %}
+            {% endfor %}
+            {% if total_fees.value == 0 %}
+                <dt>No fees recorded</dt>
+                <dd>-</dd>
+            {% else %}
+                <dt style="font-weight:700;">Total Fees</dt>
+                <dd class="text-danger" style="font-weight:700;">-${{ "%.2f" | format(total_fees.value) }}</dd>
+            {% endif %}
+        </dl>
+    </div>
+
+    <div class="detail-section">
+        <h3>Profit Calculation</h3>
+        <dl class="detail-fields">
+            <dt>Revenue</dt>
+            <dd>${{ "%.2f" | format(order.total or 0) }}</dd>
+
+            <dt>Cost of Goods</dt>
+            <dd>-${{ "%.2f" | format(cogs | default(0)) }}</dd>
+
+            <dt>Fees</dt>
+            <dd>-${{ "%.2f" | format(total_fees.value) }}</dd>
+
+            <dt style="font-weight:700;border-top:1px solid var(--border);padding-top:8px;">Profit</dt>
+            <dd style="font-weight:700;border-top:1px solid var(--border);padding-top:8px;" class="{{ 'text-success' if profit and profit > 0 else 'text-danger' }}">
+                ${{ "%.2f" | format(profit | default(0)) }}
+            </dd>
+        </dl>
+    </div>
+</div>
+
+<!-- Status Action Buttons -->
+{% if order.status != 'cancelled' and order.status != 'delivered' %}
+<div class="action-bar">
+    {% if order.status == 'pending' %}
+    <button class="btn btn-danger" onclick="if(confirm('Cancel this order?')){ location.href='{{ url_for('api.update_order_status', order_id=order.id) }}'; }">Cancel Order</button>
+    {% endif %}
+    {% if order.status == 'shipped' %}
+    <button class="btn btn-success" onclick="if(confirm('Mark as delivered?')){ location.href='{{ url_for('api.update_order_status', order_id=order.id) }}'; }">Mark Delivered</button>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    var form = document.getElementById('ship-form');
+    if (!form) return;
+
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var carrier = document.getElementById('ship-carrier').value;
+        var tracking = document.getElementById('ship-tracking').value;
+        if (!tracking) { alert('Please enter a tracking number.'); return; }
+
+        fetch('/api/marketplace/ebay/ship', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                order_id: {{ order.id }},
+                carrier: carrier,
+                tracking_number: tracking
+            })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) { location.reload(); }
+            else { alert('Error: ' + (data.error || 'Unknown error')); }
+        })
+        .catch(function(err) { alert('Request failed: ' + err); });
+    });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}{{ product.title }} - RetroMonkey{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{{ product.title }}</h1>
+    <div class="flex" style="gap:10px;">
+        <a href="{{ url_for('pages.product_list') }}" class="btn btn-secondary">&larr; Back</a>
+        <button class="btn btn-secondary">Edit</button>
+        <button class="btn btn-primary">List on Marketplace</button>
+        <button class="btn btn-secondary" hx-post="{{ url_for('api.create_product') }}" hx-vals='{"ai_optimize": true}' hx-target="#ai-result">AI Optimize</button>
+    </div>
+</div>
+
+<div id="ai-result"></div>
+
+<!-- Product Info + Inventory -->
+<div class="detail-grid">
+    <div class="detail-section">
+        <h3>Product Information</h3>
+        <dl class="detail-fields">
+            <dt>SKU</dt>
+            <dd style="font-family:monospace;">{{ product.sku }}</dd>
+
+            <dt>Title</dt>
+            <dd>{{ product.title }}</dd>
+
+            <dt>Category</dt>
+            <dd>{{ product.category or '-' }}</dd>
+
+            <dt>Condition</dt>
+            <dd>{{ product.condition or '-' }}</dd>
+
+            <dt>Cost Price</dt>
+            <dd>${{ "%.2f" | format(product.cost_price or 0) }}</dd>
+
+            <dt>Created</dt>
+            <dd>{{ product.created_at.strftime('%b %d, %Y') if product.created_at else '-' }}</dd>
+
+            <dt>Updated</dt>
+            <dd>{{ product.updated_at.strftime('%b %d, %Y %H:%M') if product.updated_at else '-' }}</dd>
+        </dl>
+
+        {% if product.description %}
+        <div class="mt-2">
+            <strong class="text-muted" style="font-size:12px;text-transform:uppercase;">Description</strong>
+            <p class="mt-1" style="font-size:13px;line-height:1.6;">{{ product.description }}</p>
+        </div>
+        {% endif %}
+
+        {% if product.images and product.images | length > 0 %}
+        <div class="mt-2">
+            <strong class="text-muted" style="font-size:12px;text-transform:uppercase;">Images</strong>
+            <div class="flex mt-1" style="gap:8px;flex-wrap:wrap;">
+                {% for img in product.images %}
+                <img src="{{ img }}" alt="Product image" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--border);">
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="detail-section">
+        <h3>Inventory</h3>
+        {% if product.inventory %}
+        <dl class="detail-fields">
+            <dt>On Hand</dt>
+            <dd>{{ product.inventory.quantity_on_hand }}</dd>
+
+            <dt>Reserved</dt>
+            <dd>{{ product.inventory.quantity_reserved }}</dd>
+
+            <dt>Available</dt>
+            <dd>{{ product.inventory.quantity_on_hand - product.inventory.quantity_reserved }}</dd>
+
+            <dt>Reorder Threshold</dt>
+            <dd>{{ product.inventory.reorder_threshold }}</dd>
+
+            <dt>Reorder Qty</dt>
+            <dd>{{ product.inventory.reorder_qty or '-' }}</dd>
+        </dl>
+        {% else %}
+        <p class="text-muted">No inventory record.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Listing History -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h3>Listing History</h3>
+    </div>
+    <div class="card-body" style="padding:0;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Marketplace</th>
+                    <th>Title</th>
+                    <th>Price</th>
+                    <th>Status</th>
+                    <th>Listed</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for listing in product.listings %}
+                <tr>
+                    <td>{{ listing.marketplace.name if listing.marketplace else '-' }}</td>
+                    <td>{{ listing.title or product.title }}</td>
+                    <td>${{ "%.2f" | format(listing.price or 0) }}</td>
+                    <td><span class="badge-status badge-{{ listing.status }}">{{ listing.status }}</span></td>
+                    <td>{{ listing.listed_at.strftime('%b %d, %Y') if listing.listed_at else '-' }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="text-center text-muted">No listings</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Order History -->
+<div class="card">
+    <div class="card-header">
+        <h3>Order History</h3>
+    </div>
+    <div class="card-body" style="padding:0;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Order #</th>
+                    <th>Qty</th>
+                    <th>Unit Price</th>
+                    <th>Subtotal</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in product.order_items %}
+                <tr>
+                    <td><a href="{{ url_for('pages.order_detail', order_id=item.order_id) }}">{{ item.order.external_order_id or item.order_id }}</a></td>
+                    <td>{{ item.quantity }}</td>
+                    <td>${{ "%.2f" | format(item.unit_price) }}</td>
+                    <td>${{ "%.2f" | format(item.subtotal) }}</td>
+                    <td>{{ item.order.ordered_at.strftime('%b %d, %Y') if item.order and item.order.ordered_at else '-' }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="text-center text-muted">No orders</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

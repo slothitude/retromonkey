@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Products - RetroMonkey{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Products</h1>
+    <button class="btn btn-primary" onclick="openModal('addProductModal')">+ Add Product</button>
+</div>
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+    <select id="filter-category" name="category"
+            hx-get="{{ url_for('pages.product_list') }}"
+            hx-target="#product-table-body"
+            hx-include="[name='status'],[name='q']">
+        <option value="">All Categories</option>
+        {% for cat in categories %}
+        <option value="{{ cat }}" {% if request.args.get('category') == cat %}selected{% endif %}>{{ cat }}</option>
+        {% endfor %}
+    </select>
+    <select id="filter-status" name="status"
+            hx-get="{{ url_for('pages.product_list') }}"
+            hx-target="#product-table-body"
+            hx-include="[name='category'],[name='q']">
+        <option value="">All Status</option>
+        <option value="in_stock">In Stock</option>
+        <option value="low_stock">Low Stock</option>
+        <option value="out_of_stock">Out of Stock</option>
+    </select>
+    <input type="text" name="q" placeholder="Search products..."
+           hx-get="{{ url_for('pages.product_list') }}"
+           hx-trigger="keyup changed delay:300ms"
+           hx-target="#product-table-body"
+           hx-include="[name='category'],[name='status']">
+</div>
+
+<!-- Product Table -->
+<div class="card">
+    <div class="card-body" style="padding: 0;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th class="checkbox-col"><input type="checkbox" id="select-all"></th>
+                    <th>SKU</th>
+                    <th>Title</th>
+                    <th>Category</th>
+                    <th>Price</th>
+                    <th>Stock</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="product-table-body">
+                {% for product in products %}
+                <tr>
+                    <td class="checkbox-col"><input type="checkbox" name="selected" value="{{ product.id }}"></td>
+                    <td><a href="{{ url_for('pages.product_detail', product_id=product.id) }}" style="font-family:monospace;font-size:12px;">{{ product.sku }}</a></td>
+                    <td>{{ product.title }}</td>
+                    <td>{{ product.category or '-' }}</td>
+                    <td>${{ "%.2f" | format(product.cost_price or 0) }}</td>
+                    <td>
+                        {% if product.inventory %}
+                            {% set qty = product.inventory.quantity_on_hand %}
+                            {% set threshold = product.inventory.reorder_threshold %}
+                            {% if qty <= 0 %}
+                                <span class="stock-warn">{{ qty }}</span>
+                            {% elif qty <= threshold %}
+                                <span class="stock-warn">{{ qty }} / {{ threshold }}</span>
+                            {% else %}
+                                <span class="stock-ok">{{ qty }}</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="text-muted">N/A</span>
+                        {% endif %}
+                    </td>
+                    <td class="actions-col">
+                        <a href="{{ url_for('pages.product_detail', product_id=product.id) }}" class="btn btn-secondary btn-sm">View</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted" style="padding:40px;">No products yet. Click "Add Product" to get started.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Product Modal -->
+<div class="modal-overlay" id="addProductModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Add Product</h3>
+            <button class="modal-close" onclick="closeModal('addProductModal')">&times;</button>
+        </div>
+        <form action="{{ url_for('api.create_product') }}" method="POST">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>SKU</label>
+                    <input type="text" name="sku" value="{{ next_sku | default('') }}" placeholder="Auto-generated if blank">
+                </div>
+                <div class="form-group">
+                    <label>Title</label>
+                    <input type="text" name="title" required placeholder="Product title">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea name="description" placeholder="Product description"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Category</label>
+                        <input type="text" name="category" placeholder="e.g. Electronics">
+                    </div>
+                    <div class="form-group">
+                        <label>Condition</label>
+                        <select name="condition">
+                            <option value="new">New</option>
+                            <option value="used">Used</option>
+                            <option value="refurbished">Refurbished</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Cost Price ($)</label>
+                        <input type="number" name="cost_price" step="0.01" min="0" placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label>Initial Stock</label>
+                        <input type="number" name="initial_stock" min="0" value="0">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('addProductModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Product</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

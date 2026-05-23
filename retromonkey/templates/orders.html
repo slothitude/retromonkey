@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}Orders - RetroMonkey{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Orders</h1>
+    <div class="flex" style="gap:8px;">
+        <button class="btn btn-secondary" id="batch-ship-btn" disabled>Mark Shipped</button>
+    </div>
+</div>
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+    <select id="filter-status" name="status"
+            hx-get="{{ url_for('pages.order_list') }}"
+            hx-target="#order-table-body"
+            hx-include="[name='marketplace']">
+        <option value="">All Status</option>
+        <option value="pending" {% if request.args.get('status') == 'pending' %}selected{% endif %}>Pending</option>
+        <option value="shipped" {% if request.args.get('status') == 'shipped' %}selected{% endif %}>Shipped</option>
+        <option value="delivered" {% if request.args.get('status') == 'delivered' %}selected{% endif %}>Delivered</option>
+        <option value="cancelled" {% if request.args.get('status') == 'cancelled' %}selected{% endif %}>Cancelled</option>
+    </select>
+    <select id="filter-marketplace" name="marketplace"
+            hx-get="{{ url_for('pages.order_list') }}"
+            hx-target="#order-table-body"
+            hx-include="[name='status']">
+        <option value="">All Marketplaces</option>
+        {% for mp in marketplaces %}
+        <option value="{{ mp.id }}" {% if request.args.get('marketplace') | string == mp.id | string %}selected{% endif %}>{{ mp.name }}</option>
+        {% endfor %}
+    </select>
+    <select name="sort">
+        <option value="date_desc" selected>Newest First</option>
+        <option value="date_asc">Oldest First</option>
+        <option value="total_desc">Highest Total</option>
+        <option value="total_asc">Lowest Total</option>
+    </select>
+</div>
+
+<!-- Orders Table -->
+<div class="card">
+    <div class="card-body" style="padding:0;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th class="checkbox-col"><input type="checkbox" id="select-all-orders"></th>
+                    <th>Order #</th>
+                    <th>Buyer</th>
+                    <th>Items</th>
+                    <th>Total</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="order-table-body">
+                {% for order in orders %}
+                <tr>
+                    <td class="checkbox-col">
+                        <input type="checkbox" name="selected_orders" value="{{ order.id }}"
+                               class="order-checkbox" {% if order.status == 'shipped' %}disabled{% endif %}>
+                    </td>
+                    <td><a href="{{ url_for('pages.order_detail', order_id=order.id) }}">{{ order.external_order_id or order.id }}</a></td>
+                    <td>{{ order.buyer_name or '-' }}</td>
+                    <td>{{ order.items | length }}</td>
+                    <td>${{ "%.2f" | format(order.total or 0) }}</td>
+                    <td><span class="badge-status badge-{{ order.status }}">{{ order.status }}</span></td>
+                    <td>{{ order.ordered_at.strftime('%b %d, %H:%M') if order.ordered_at else '-' }}</td>
+                    <td class="actions-col">
+                        <a href="{{ url_for('pages.order_detail', order_id=order.id) }}" class="btn btn-secondary btn-sm">View</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="text-center text-muted" style="padding:40px;">No orders yet</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    var selectAll = document.getElementById('select-all-orders');
+    var batchBtn = document.getElementById('batch-ship-btn');
+
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            var checked = this.checked;
+            document.querySelectorAll('.order-checkbox:not(:disabled)').forEach(function(cb) {
+                cb.checked = checked;
+            });
+            updateBatchBtn();
+        });
+    }
+
+    document.addEventListener('change', function(e) {
+        if (e.target.classList.contains('order-checkbox')) {
+            updateBatchBtn();
+        }
+    });
+
+    function updateBatchBtn() {
+        var selected = document.querySelectorAll('.order-checkbox:checked').length;
+        if (batchBtn) {
+            batchBtn.disabled = selected === 0;
+            batchBtn.textContent = selected > 0 ? 'Mark Shipped (' + selected + ')' : 'Mark Shipped';
+        }
+    }
+
+    if (batchBtn) {
+        batchBtn.addEventListener('click', function() {
+            var ids = [];
+            document.querySelectorAll('.order-checkbox:checked').forEach(function(cb) {
+                ids.push(cb.value);
+            });
+            if (ids.length === 0) return;
+            if (!confirm('Mark ' + ids.length + ' order(s) as shipped?')) return;
+
+            ids.forEach(function(id) {
+                fetch('/api/orders/' + id + '/ship', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                }).catch(function(err) { console.error(err); });
+            });
+            setTimeout(function() { location.reload(); }, 500);
+        });
+    }
+})();
+</script>
+{% endblock %}

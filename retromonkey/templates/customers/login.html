@@ -1,0 +1,25 @@
+{% extends "store/base.html" %}
+{% block title %}Login — RetroMonkey{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-card">
+        <h1>Sign In</h1>
+        <p class="auth-subtitle">Access your orders and account details.</p>
+
+        <form method="POST" class="auth-form">
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" required autocomplete="email">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required autocomplete="current-password">
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg btn-block">Sign In</button>
+        </form>
+
+        <p class="auth-link">Don't have an account? <a href="/account/register">Create one</a></p>
+    </div>
+</div>
+{% endblock %}

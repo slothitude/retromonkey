@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}Inbox - RetroMonkey{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Inbox</h1>
+    <button class="btn btn-secondary"
+            hx-post="{{ url_for('intelligence.communications_sync') }}"
+            hx-indicator="#sync-spinner">Sync Now</button>
+    <span id="sync-spinner" class="htmx-indicator" style="margin-left:8px;">Syncing...</span>
+</div>
+
+<div class="two-pane">
+    <!-- Left Pane: Message List -->
+    <div class="pane-list">
+        {% for message in messages %}
+        <div class="message-item {% if message.id == selected_message_id %}selected{% endif %}"
+             hx-get="{{ url_for('pages.inbox') }}?message={{ message.id }}"
+             hx-target="#message-detail"
+             hx-swap="innerHTML">
+            <div class="flex-between">
+                <span class="msg-channel">{{ message.channel }}</span>
+                <span class="msg-time">{{ message.created_at.strftime('%b %d, %H:%M') if message.created_at else '' }}</span>
+            </div>
+            <div class="msg-from">{{ message.from_addr or 'Unknown' }}</div>
+            <div class="msg-subject">{{ message.subject or '(no subject)' }}</div>
+        </div>
+        {% else %}
+        <div class="text-center text-muted" style="padding:40px;">
+            <p>No messages yet.</p>
+            <p style="font-size:12px;margin-top:8px;">Click "Sync Now" to pull messages from your connected marketplaces.</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Right Pane: Message Detail -->
+    <div class="pane-detail" id="message-detail">
+        {% if selected_message %}
+        <div class="mb-3">
+            <h2 style="font-size:16px;font-weight:600;">{{ selected_message.subject or '(no subject)' }}</h2>
+            <div class="flex-between mt-1">
+                <span class="text-muted" style="font-size:12px;">
+                    From: {{ selected_message.from_addr or 'Unknown' }}
+                    {% if selected_message.direction == 'outbound' %} (sent){% endif %}
+                </span>
+                <span class="text-muted" style="font-size:12px;">
+                    {{ selected_message.created_at.strftime('%b %d, %Y %H:%M') if selected_message.created_at else '' }}
+                </span>
+            </div>
+            {% if selected_message.related_order_id %}
+            <div class="mt-1">
+                <a href="{{ url_for('pages.order_detail', order_id=selected_message.related_order_id) }}" style="font-size:12px;">
+                    Related Order #{{ selected_message.related_order_id }}
+                </a>
+            </div>
+            {% endif %}
+            {% if selected_message.related_product_id %}
+            <div class="mt-1">
+                <a href="{{ url_for('pages.product_detail', product_id=selected_message.related_product_id) }}" style="font-size:12px;">
+                    Related Product #{{ selected_message.related_product_id }}
+                </a>
+            </div>
+            {% endif %}
+        </div>
+
+        <hr style="border:none;border-top:1px solid var(--border);margin:16px 0;">
+
+        <!-- Message Body -->
+        <div class="message-body" style="font-size:14px;line-height:1.7;margin-bottom:24px;">
+            {{ selected_message.body or '(empty message)' }}
+        </div>
+
+        <!-- AI Suggested Reply -->
+        {% if selected_message.ai_draft %}
+        <div class="card" style="border-color:var(--accent);background:var(--accent-light);">
+            <div class="card-header" style="padding:10px 16px;">
+                <h3 style="font-size:13px;color:var(--accent);">AI Suggested Reply</h3>
+            </div>
+            <div class="card-body" style="padding:16px;">
+                <div id="ai-reply-{{ selected_message.id }}" contenteditable="true"
+                     style="min-height:60px;font-size:13px;line-height:1.6;border:1px solid var(--border);border-radius:var(--radius-md);padding:10px;background:var(--bg-input);">
+                    {{ selected_message.ai_reply or 'AI reply content will appear here...' }}
+                </div>
+                <div class="flex" style="gap:8px;margin-top:12px;">
+                    <button class="btn btn-primary btn-sm"
+                            hx-post="{{ url_for('intelligence.communications_send', message_id=selected_message.id) }}"
+                            hx-vals='js:{body: document.getElementById("ai-reply-{{ selected_message.id }}").innerText}'
+                            hx-target="#message-detail">Approve & Send</button>
+                    <button class="btn btn-secondary btn-sm" onclick="discardReply({{ selected_message.id }})">Discard</button>
+                </div>
+            </div>
+        </div>
+        {% elif selected_message.direction == 'inbound' %}
+        <div class="flex" style="gap:8px;">
+            <button class="btn btn-primary btn-sm"
+                    hx-post="{{ url_for('intelligence.communications_draft', message_id=selected_message.id) }}"
+                    hx-target="#message-detail"
+                    hx-indicator="#reply-spinner">Generate AI Reply</button>
+            <span id="reply-spinner" class="htmx-indicator">Generating...</span>
+            <button class="btn btn-secondary btn-sm" onclick="manualReply({{ selected_message.id }})">Manual Reply</button>
+        </div>
+        {% endif %}
+
+        {% else %}
+        <div class="text-center text-muted" style="padding:60px 20px;">
+            <p style="font-size:16px;">Select a message to view</p>
+            <p style="font-size:13px;margin-top:8px;">Click on a message from the list to see its content here.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function discardReply(messageId) {
+    if (!confirm('Discard this AI reply?')) return;
+    fetch('/api/messages/' + messageId + '/discard-reply', { method: 'POST' })
+        .then(function() { location.reload(); });
+}
+
+function manualReply(messageId) {
+    var detail = document.getElementById('message-detail');
+    var replyArea = document.createElement('div');
+    replyArea.innerHTML = '<div class="card mt-3"><div class="card-header"><h3 style="font-size:13px;">Manual Reply</h3></div><div class="card-body"><textarea id="manual-reply-text" style="width:100%;min-height:100px;padding:10px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg-input);color:var(--text-primary);font-family:inherit;font-size:13px;" placeholder="Type your reply..."></textarea><div class="flex" style="gap:8px;margin-top:12px;"><button class="btn btn-primary btn-sm" onclick="sendManualReply(' + messageId + ')">Send</button><button class="btn btn-secondary btn-sm" onclick="this.closest(\'.card\').remove()">Cancel</button></div></div></div>';
+    detail.appendChild(replyArea);
+}
+
+function sendManualReply(messageId) {
+    var text = document.getElementById('manual-reply-text').value;
+    if (!text.trim()) { alert('Please enter a reply.'); return; }
+    fetch('/api/messages/' + messageId + '/reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body: text })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) location.reload();
+        else alert('Error: ' + (data.error || 'Unknown'));
+    });
+}
+</script>
+{% endblock %}

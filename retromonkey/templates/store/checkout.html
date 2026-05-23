@@ -1,0 +1,77 @@
+{% extends "store/base.html" %}
+{% block title %}Checkout — RetroMonkey{% endblock %}
+
+{% block content %}
+<div class="checkout-page">
+    <h1>Checkout</h1>
+
+    <div class="checkout-layout">
+        <div class="checkout-items">
+            <h2>Order Summary</h2>
+            {% for item in items %}
+            <div class="checkout-item">
+                <span>{{ item.title }} x{{ item.qty }}</span>
+                <span>${{ "%.2f"|format(item.line_total) }}</span>
+            </div>
+            {% endfor %}
+            <hr>
+            <div class="checkout-item">
+                <span>Subtotal</span>
+                <span>${{ "%.2f"|format(total) }}</span>
+            </div>
+            <div class="checkout-item">
+                <span>Shipping</span>
+                <span>{% if shipping == 0 %}FREE{% else %}${{ "%.2f"|format(shipping) }}{% endif %}</span>
+            </div>
+            {% if gst %}
+            <div class="checkout-item">
+                <span>Includes GST (10%)</span>
+                <span>${{ "%.2f"|format(gst) }}</span>
+            </div>
+            {% endif %}
+            <hr>
+            <div class="checkout-total">
+                <span>Total</span>
+                <span>${{ "%.2f"|format(total + shipping) }}</span>
+            </div>
+        </div>
+
+        <div class="checkout-action">
+            <h2>Payment</h2>
+            <p>Click below to pay securely with Stripe. We accept all major credit cards.</p>
+            <button id="checkout-btn" class="btn btn-primary btn-lg btn-block">
+                Pay ${{ "%.2f"|format(total + shipping) }} with Stripe
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://js.stripe.com/v3/"></script>
+<script>
+    const btn = document.getElementById('checkout-btn');
+    btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        btn.textContent = 'Redirecting...';
+        try {
+            const resp = await fetch('/create-checkout-session', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            });
+            const data = await resp.json();
+            if (data.url) {
+                window.location = data.url;
+            } else {
+                alert(data.error || 'Something went wrong');
+                btn.disabled = false;
+                btn.textContent = 'Pay with Stripe';
+            }
+        } catch (e) {
+            alert('Network error');
+            btn.disabled = false;
+            btn.textContent = 'Pay with Stripe';
+        }
+    });
+</script>
+{% endblock %}

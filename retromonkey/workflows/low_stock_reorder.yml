@@ -1,0 +1,49 @@
+name: low_stock_reorder
+description: >
+  Automatically trigger reorder and supplier notification when inventory
+  drops to or below the reorder threshold.
+trigger:
+  event: low_stock
+
+actions:
+  - type: notify
+    channel: dashboard
+    level: warning
+    message: "Low stock alert: {{sku}} ({{product_title}}) - {{available_qty}} units remaining"
+
+  - type: condition
+    field: preferred_supplier_id
+    operator: "!="
+    value: ""
+    then:
+      type: create_po
+      product_id: "{{product_id}}"
+      supplier_id: "{{preferred_supplier_id}}"
+      qty: "{{suggested_qty}}"
+      unit_cost: "{{unit_cost}}"
+    else:
+      type: notify
+      channel: dashboard
+      level: warning
+      message: "No preferred supplier for {{sku}} - manual reorder required"
+
+  - type: send_email
+    to: "orders@retromonkey.com"
+    subject: "Reorder Alert: {{sku}} - {{suggested_qty}} units needed"
+    body: >
+      Automated low-stock reorder notification.
+
+      Product: {{product_title}} ({{sku}})
+      Current Available: {{available_qty}} units
+      Reorder Threshold: {{reorder_threshold}} units
+      Suggested Quantity: {{suggested_qty}} units
+
+      A purchase order has been created automatically if a preferred supplier was on file.
+      Otherwise, please source this product manually.
+
+      - RetroMonkey Inventory System
+
+  - type: log_event
+    channel: system
+    subject: "Low stock reorder"
+    message: "Low stock triggered for {{sku}}: {{available_qty}} remaining, suggested reorder {{suggested_qty}} units"

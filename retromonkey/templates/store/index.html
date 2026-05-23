@@ -1,0 +1,128 @@
+{% extends "store/base.html" %}
+{% block title %}RetroMonkey — Retro Gaming Handhelds{% endblock %}
+
+{% block head %}
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "RetroMonkey",
+    "url": "{{ config.SITE_URL }}",
+    "potentialAction": {
+        "@type": "SearchAction",
+        "target": "{{ config.SITE_URL }}/search?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+    }
+}
+</script>
+{% endblock %}
+
+{% macro product_card(p, loop) %}
+<a href="/product/{{ p.slug or p.id }}" class="product-card reveal reveal-delay-{{ loop.index % 4 + 1 }}{% if p.badge %} has-badge{% endif %}">
+    {% if p.badge %}
+    <span class="badge">{{ p.badge }}</span>
+    {% endif %}
+    <div class="product-image">
+        {% if p.main_image %}
+        <img src="{{ p.main_image }}" alt="{{ p.title }}" class="product-img" loading="lazy">
+        {% else %}
+        <div class="product-placeholder"><span>{{ p.title[0:2] }}</span></div>
+        {% endif %}
+    </div>
+    <div class="product-info">
+        <h3>{{ p.title }}</h3>
+        {% if p.tagline %}
+        <p class="tagline">{{ p.tagline }}</p>
+        {% endif %}
+        <div class="price-row">
+            {% if p.price %}
+            <span class="price">${{ "%.2f"|format(p.price) }}</span>
+            {% if p.compare_price and p.compare_price > p.price %}
+            <span class="compare-price">${{ "%.2f"|format(p.compare_price) }}</span>
+            {% endif %}
+            {% endif %}
+        </div>
+        {% if p.price and p.price >= 50 %}
+        <span style="font-size:0.75em;color:#10b981;font-weight:600">FREE SHIPPING</span>
+        {% endif %}
+    </div>
+</a>
+{% endmacro %}
+
+{% block content %}
+<section class="hero" style="position:relative;overflow:hidden;background:#050508">
+    <img src="/static/images/hero-banner.webp" alt="RetroMonkey" style="width:100%;height:auto;display:block;opacity:0.5">
+    <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 50%,#050508 100%);pointer-events:none"></div>
+    {% if featured %}
+    <div class="product-grid" style="position:absolute;bottom:8%;left:50%;transform:translateX(-50%);z-index:1;max-width:1200px;width:calc(100% - 3rem)">
+        {% for p in featured %}
+        {{ product_card(p, loop) }}
+        {% endfor %}
+    </div>
+    {% endif %}
+</section>
+
+<section id="products" class="all-products">
+    <h2 class="section-title reveal">All Products</h2>
+    <div class="product-grid">
+        {% for p in products %}
+        {{ product_card(p, loop) }}
+        {% endfor %}
+    </div>
+    {% if not products %}
+    <div class="empty-state">
+        <p>No products available yet. Check back soon!</p>
+    </div>
+    {% endif %}
+</section>
+
+<section class="trust-bar reveal">
+    <div class="trust-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        Free shipping over $50
+    </div>
+    <div class="trust-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Secure Stripe checkout
+    </div>
+    <div class="trust-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Australian support
+    </div>
+    <div class="trust-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        30-day returns
+    </div>
+</section>
+
+<section class="newsletter-section reveal">
+    <h2>Stay in the Loop</h2>
+    <p>Get notified about new products, deals, and retro gaming news.</p>
+    <form class="newsletter-form" id="newsletter-form">
+        <input type="email" name="email" placeholder="you@example.com" required>
+        <button type="submit" class="btn btn-primary">Subscribe</button>
+    </form>
+    <p class="newsletter-msg" id="newsletter-msg"></p>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('newsletter-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const msg = document.getElementById('newsletter-msg');
+    try {
+        const res = await fetch('/newsletter', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: form.email.value })
+        });
+        const data = await res.json();
+        msg.textContent = data.message || data.error;
+        msg.style.color = data.error ? '#ef4444' : '#00ff88';
+        if (!data.error) form.reset();
+    } catch { msg.textContent = 'Something went wrong'; msg.style.color = '#ef4444'; }
+});
+</script>
+{% endblock %}

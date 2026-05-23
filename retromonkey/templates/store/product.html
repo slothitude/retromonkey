@@ -1,0 +1,120 @@
+{% extends "store/base.html" %}
+{% block title %}{{ product.title }} — RetroMonkey{% endblock %}
+
+{% block head %}
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "name": "{{ product.title }}",
+    "description": "{{ product.tagline or product.description or '' }}",
+    {% if product.main_image %}"image": "{{ product.main_image }}",{% endif %}
+    "brand": { "@type": "Brand", "name": "RetroMonkey" },
+    "offers": {
+        "@type": "Offer",
+        "url": "{{ config.SITE_URL }}/product/{{ product.slug }}",
+        "priceCurrency": "AUD",
+        "price": "{{ '%.2f'|format(product.price or 0) }}",
+        "availability": "https://schema.org/{% if product.stock > 0 %}InStock{% else %}OutOfStock{% endif %}"
+    }
+}
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="product-page">
+    <a href="/" class="back-link">&larr; Back to Store</a>
+
+    <div class="product-detail">
+        <div class="product-gallery">
+            <div class="product-image-large">
+                {% if product.main_image %}
+                <img src="{{ product.main_image }}" alt="{{ product.title }}" class="product-img-lg" id="main-product-img">
+                {% else %}
+                <div class="product-placeholder-lg">
+                    <span>{{ product.title[0:3] }}</span>
+                </div>
+                {% endif %}
+            </div>
+            {% set imgs = product.image_list %}
+            {% if imgs|length > 1 %}
+            <div class="product-thumbnails">
+                {% for img in imgs %}
+                <img src="{{ img }}" alt="{{ product.title }} {{ loop.index }}" class="product-thumb{% if loop.first %} active{% endif %}" onclick="document.getElementById('main-product-img').src='{{ img }}'; document.querySelectorAll('.product-thumb').forEach(t=>t.classList.remove('active')); this.classList.add('active');">
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="product-meta">
+            {% if product.badge %}
+            <span class="badge">{{ product.badge }}</span>
+            {% endif %}
+            <h1>{{ product.title }}</h1>
+            {% if product.tagline %}
+            <p class="tagline">{{ product.tagline }}</p>
+            {% endif %}
+
+            <div class="price-row big">
+                {% if product.price %}
+                <span class="price">${{ "%.2f"|format(product.price) }}</span>
+                {% if product.compare_price and product.compare_price > product.price %}
+                <span class="compare-price">${{ "%.2f"|format(product.compare_price) }}</span>
+                <span class="save-badge">Save ${{ "%.2f"|format(product.compare_price - product.price) }}</span>
+                {% endif %}
+                {% else %}
+                <span class="price">Contact for price</span>
+                {% endif %}
+            </div>
+
+            {% if product.stock > 0 %}
+            <p class="stock in-stock">In Stock ({{ product.stock }} available)</p>
+            {% else %}
+            <p class="stock out-of-stock">Out of Stock</p>
+            {% endif %}
+
+            {% if product.price and product.stock > 0 %}
+            <form method="POST" action="/cart/add" class="add-to-cart-form">
+                <input type="hidden" name="product_id" value="{{ product.id }}">
+                <div class="qty-row">
+                    <label>Qty:</label>
+                    <select name="qty">
+                        {% for i in range(1, [product.stock + 1, 11]|min) %}
+                        <option value="{{ i }}">{{ i }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary btn-lg">Add to Cart</button>
+            </form>
+            {% elif product.price and product.stock <= 0 %}
+            <button class="btn btn-primary btn-lg" disabled>Out of Stock</button>
+            {% endif %}
+
+            <p class="shipping-note">Free shipping on orders over $50</p>
+        </div>
+    </div>
+
+    <div class="product-sections">
+        {% if product.description %}
+        <div class="product-description">
+            <h2>Description</h2>
+            <p>{{ product.description }}</p>
+        </div>
+        {% endif %}
+
+        {% if product.specs %}
+        <div class="product-specs">
+            <h2>Specifications</h2>
+            <table class="specs-table">
+                {% for key, val in product.specs.items() %}
+                <tr>
+                    <td class="spec-key">{{ key }}</td>
+                    <td>{{ val }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

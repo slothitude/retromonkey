@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+
+{% block title %}Sourcing & Suppliers - RetroMonkey{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Sourcing & Suppliers</h1>
+    <button class="btn btn-primary" onclick="openModal('researchModal')">Research Niche</button>
+</div>
+
+<div class="tabs-wrapper">
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="tab-suppliers">Suppliers</button>
+        <button class="tab-btn" data-tab="tab-rfqs">RFQs</button>
+        <button class="tab-btn" data-tab="tab-pos">Purchase Orders</button>
+        <button class="tab-btn" data-tab="tab-quality">Quality</button>
+    </div>
+
+    <!-- Tab: Suppliers -->
+    <div class="tab-content active" id="tab-suppliers">
+        <div class="card">
+            <div class="card-body" style="padding:0;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Platform</th>
+                            <th>Rating</th>
+                            <th>Score</th>
+                            <th>Trade Assurance</th>
+                            <th>Response Time</th>
+                            <th>MOQ</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for supplier in suppliers %}
+                        <tr>
+                            <td>{{ supplier.name }}</td>
+                            <td>{{ supplier.platform or '-' }}</td>
+                            <td>{{ supplier.rating or '-' }}</td>
+                            <td>
+                                {% if supplier.scores and supplier.scores | length > 0 %}
+                                    {% set score = supplier.scores[0].overall_score %}
+                                    {% if score %}
+                                        <span class="score-badge {{ 'score-high' if score > 75 else ('score-mid' if score > 50 else 'score-low') }}">{{ "%.0f" | format(score) }}</span>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>{{ '&#10004;' if supplier.trade_assurance else '&#10008;' }}</td>
+                            <td>{{ supplier.response_time_hours ~ 'h' if supplier.response_time_hours else '-' }}</td>
+                            <td>{{ supplier.min_order_qty or '-' }}</td>
+                            <td class="actions-col">
+                                <button class="btn btn-secondary btn-sm"
+                                        hx-post="{{ url_for('sourcing.create_rfq') }}"
+                                        hx-confirm="Send RFQ to {{ supplier.name }}?">Send RFQ</button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted" style="padding:40px;">No suppliers added yet. Use "Research Niche" to find suppliers.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: RFQs -->
+    <div class="tab-content" id="tab-rfqs">
+        <div class="card">
+            <div class="card-body" style="padding:0;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Supplier</th>
+                            <th>Product</th>
+                            <th>Target Qty</th>
+                            <th>Price Range</th>
+                            <th>Status</th>
+                            <th>Sent</th>
+                            <th>Response</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rfq in rfqs %}
+                        <tr>
+                            <td>{{ rfq.supplier.name if rfq.supplier else '-' }}</td>
+                            <td>{{ rfq.product.title if rfq.product else '-' }}</td>
+                            <td>{{ rfq.target_qty or '-' }}</td>
+                            <td>{{ rfq.target_price_range or '-' }}</td>
+                            <td><span class="badge-status badge-{{ 'active' if rfq.status == 'responded' else 'pending' }}">{{ rfq.status }}</span></td>
+                            <td>{{ rfq.sent_at.strftime('%b %d') if rfq.sent_at else '-' }}</td>
+                            <td>{{ rfq.response_at.strftime('%b %d') if rfq.response_at else '-' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted" style="padding:40px;">No RFQs sent yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Purchase Orders -->
+    <div class="tab-content" id="tab-pos">
+        <div class="card">
+            <div class="card-body" style="padding:0;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>PO #</th>
+                            <th>Supplier</th>
+                            <th>Product</th>
+                            <th>Qty</th>
+                            <th>Unit Cost</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                            <th>Expected</th>
+                            <th>Tracking</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for po in purchase_orders %}
+                        <tr>
+                            <td><a href="#">{{ po.id }}</a></td>
+                            <td>{{ po.supplier.name if po.supplier else '-' }}</td>
+                            <td>{{ po.product.title if po.product else '-' }}</td>
+                            <td>{{ po.qty }}</td>
+                            <td>${{ "%.2f" | format(po.unit_cost or 0) }}</td>
+                            <td>${{ "%.2f" | format(po.total_cost or 0) }}</td>
+                            <td><span class="badge-status badge-{{ po.status }}">{{ po.status }}</span></td>
+                            <td>{{ po.expected_delivery.strftime('%b %d') if po.expected_delivery else '-' }}</td>
+                            <td>{{ po.tracking_number or '-' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="9" class="text-center text-muted" style="padding:40px;">No purchase orders yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Quality -->
+    <div class="tab-content" id="tab-quality">
+        <div class="card">
+            <div class="card-body" style="padding:0;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Supplier</th>
+                            <th>Overall Score</th>
+                            <th>Defect Rate</th>
+                            <th>On-Time Delivery</th>
+                            <th>Packaging</th>
+                            <th>Communication</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for score in supplier_scores %}
+                        <tr>
+                            <td>{{ score.supplier.name if score.supplier else '-' }}</td>
+                            <td>
+                                {% if score.overall_score %}
+                                <span class="score-badge {{ 'score-high' if score.overall_score > 75 else ('score-mid' if score.overall_score > 50 else 'score-low') }}">
+                                    {{ "%.0f" | format(score.overall_score) }}
+                                </span>
+                                {% else %}-{% endif %}
+                            </td>
+                            <td>{{ "%.1f%%" | format(score.defect_rate * 100) if score.defect_rate else '-' }}</td>
+                            <td>{{ "%.1f%%" | format(score.delivery_on_time * 100) if score.delivery_on_time else '-' }}</td>
+                            <td>{{ "%.1f" | format(score.packaging_quality) if score.packaging_quality else '-' }}/10</td>
+                            <td>{{ "%.1f" | format(score.communication_rating) if score.communication_rating else '-' }}/10</td>
+                            <td class="text-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ score.notes or '-' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted" style="padding:40px;">No quality data yet. Quality scores appear after receiving shipments.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Research Niche Modal -->
+<div class="modal-overlay" id="researchModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Research Niche</h3>
+            <button class="modal-close" onclick="closeModal('researchModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Product Keywords</label>
+                <input type="text" name="keywords" placeholder="e.g. retro gaming controller, bluetooth speaker">
+            </div>
+            <div class="form-group">
+                <label>Target Market</label>
+                <select name="market">
+                    <option value="AU">Australia</option>
+                    <option value="US">United States</option>
+                    <option value="UK">United Kingdom</option>
+                    <option value="EU">Europe</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Price Range</label>
+                <div class="form-row">
+                    <input type="number" name="price_min" placeholder="Min $" step="0.01">
+                    <input type="number" name="price_max" placeholder="Max $" step="0.01">
+                </div>
+            </div>
+            <p class="text-muted" style="font-size:12px;">AI will search Alibaba suppliers, analyze market demand, and return a ranked list with scoring.</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('researchModal')">Cancel</button>
+            <button class="btn btn-primary"
+                    hx-post="{{ url_for('sourcing.research_niche') }}"
+                    hx-include="closest .modal"
+                    hx-target="#research-results"
+                    hx-on::after-request="closeModal('researchModal')">
+                Start Research
+            </button>
+        </div>
+    </div>
+</div>
+
+<div id="research-results"></div>
+{% endblock %}

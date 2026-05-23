@@ -1,0 +1,81 @@
+{% extends "store/base.html" %}
+{% block title %}Track Your Order — RetroMonkey{% endblock %}
+
+{% block content %}
+<div class="track-page">
+    <h1>Track Your Order</h1>
+    <p>Enter your order number or email address to check the status of your order.</p>
+
+    <form method="POST" class="track-form">
+        <div class="form-row">
+            <input type="text" name="query" value="{{ query }}" placeholder="Order # or email address" class="track-input" required>
+            <button type="submit" class="btn btn-primary">Track</button>
+        </div>
+    </form>
+
+    {% if query and not results %}
+    <div class="empty-state">
+        <p>No orders found for "{{ query }}". Check your order number or email and try again.</p>
+    </div>
+    {% endif %}
+
+    {% for result in results %}
+    {% set order = result.order %}
+    {% set items = result.items %}
+    <div class="track-result">
+        <div class="track-header">
+            <h2>Order #{{ order.id }}</h2>
+            <span class="status-badge status-{{ order.status }}">{{ order.status|title }}</span>
+        </div>
+
+        <div class="track-details">
+            <div class="track-detail-row">
+                <span>Date:</span>
+                <span>{{ order.ordered_at.strftime('%Y-%m-%d %H:%M') if order.ordered_at else 'N/A' }}</span>
+            </div>
+            <div class="track-detail-row">
+                <span>Email:</span>
+                <span>{{ order.buyer_email or 'N/A' }}</span>
+            </div>
+            {% if order.tracking %}
+            <div class="track-detail-row">
+                <span>Tracking:</span>
+                <span class="tracking-num">{{ order.tracking }}</span>
+            </div>
+            {% endif %}
+            <div class="track-detail-row">
+                <span>Total:</span>
+                <span>${{ "%.2f"|format(order.total or 0) }}</span>
+            </div>
+        </div>
+
+        <table class="admin-table">
+            <thead><tr><th>Item</th><th>Qty</th><th>Price</th></tr></thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>{{ item.name }}</td>
+                    <td>{{ item.qty }}</td>
+                    <td>${{ "%.2f"|format(item.price * item.qty) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if order.status == 'paid' %}
+        <div class="track-status-msg">
+            <p>Your order has been received and payment confirmed. We'll ship it within 1-3 business days.</p>
+        </div>
+        {% elif order.status == 'shipped' %}
+        <div class="track-status-msg">
+            <p>Your order has been shipped! Use the tracking number above to follow its journey.</p>
+        </div>
+        {% elif order.status == 'delivered' %}
+        <div class="track-status-msg">
+            <p>Your order has been delivered. Enjoy your retro gaming!</p>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

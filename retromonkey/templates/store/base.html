@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}RetroMonkey{% endblock %}</title>
+    <meta name="description" content="{% block meta_description %}RetroMonkey — Australia's retro gaming handheld store. Free shipping over $50. Secure checkout.{% endblock %}">
+    <link rel="canonical" href="{{ config.SITE_URL }}{{ request.path }}">
+
+    <!-- Open Graph -->
+    <meta property="og:site_name" content="RetroMonkey">
+    <meta property="og:title" content="{% block og_title %}RetroMonkey — Retro Gaming Handhelds{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}Australia's retro gaming handheld store. Free shipping over $50.{% endblock %}">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ request.url }}">
+    <meta property="og:image" content="{% block og_image %}{{ config.SITE_URL }}/static/images/og-banner.webp{% endblock %}">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{% block tw_title %}RetroMonkey — Retro Gaming Handhelds{% endblock %}">
+
+    <link rel="stylesheet" href="/static/css/store.css">
+
+    <!-- Organization JSON-LD -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "RetroMonkey",
+        "url": "{{ config.SITE_URL }}",
+        "description": "Australia's retro gaming handheld store.",
+        "address": { "@type": "PostalAddress", "addressCountry": "AU" }
+    }
+    </script>
+
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <header>
+        <div class="header-inner">
+            <a href="/" class="logo">
+                <span class="logo-icon">&#128053;</span>
+                <span class="logo-text">Retro<span class="accent">Monkey</span></span>
+            </a>
+            <nav>
+                <form class="nav-search" action="/search" method="GET">
+                    <input type="text" name="q" placeholder="Search products..." value="{{ request.args.get('q', '') }}">
+                </form>
+                <a href="/">Store</a>
+                {% if session.get('customer_id') %}
+                <a href="/account" class="nav-account">{{ session.get('customer_name', 'Account') }}</a>
+                {% else %}
+                <a href="/account/login" class="nav-account">Sign In</a>
+                {% endif %}
+                <a href="/cart" class="cart-link">
+                    Cart{% if cart_items %} <span class="cart-badge">{{ cart_items }}</span>{% endif %}
+                </a>
+            </nav>
+            <button class="hamburger" aria-label="Menu" aria-expanded="false">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Mobile slide-out nav -->
+    <div class="mobile-overlay"></div>
+    <div class="mobile-nav">
+        <div class="mobile-nav-inner">
+            <form class="mobile-search" action="/search" method="GET">
+                <input type="text" name="q" placeholder="Search products..." value="{{ request.args.get('q', '') }}">
+            </form>
+            <a href="/">Store</a>
+            {% if session.get('customer_id') %}
+            <a href="/account">{{ session.get('customer_name', 'Account') }}</a>
+            <a href="/account/logout" class="mobile-signout">Sign Out</a>
+            {% else %}
+            <a href="/account/login">Sign In</a>
+            {% endif %}
+            <a href="/cart" class="mobile-cart">Cart{% if cart_items %} <span class="cart-badge">{{ cart_items }}</span>{% endif %}</a>
+        </div>
+    </div>
+
+    <main>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flash-messages">
+            {% for category, msg in messages %}
+            <div class="flash flash-{{ category }}">{{ msg }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer>
+        <div class="footer-inner">
+            <div class="footer-col">
+                <h4>RetroMonkey</h4>
+                <p>Australia's retro gaming handheld store. Pre-loaded with thousands of classic games.</p>
+                {% if config.ABN %}<p class="abn">ABN: {{ config.ABN }}</p>{% endif %}
+            </div>
+            <div class="footer-col">
+                <h4>Orders</h4>
+                <a href="/track">Track Your Order</a>
+                <a href="/privacy">Privacy Policy</a>
+                <a href="/terms">Terms of Service</a>
+            </div>
+        </div>
+        <div class="footer-strip">
+            <img src="/static/images/footer-strip.webp" alt="RetroMonkey">
+            <div class="footer-strip-overlay"></div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 RetroMonkey. All rights reserved. All prices include GST where applicable.{% if config.ABN %} ABN: {{ config.ABN }}.{% endif %}</p>
+        </div>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+
+    <script>
+    // Glass nav scroll effect
+    const header = document.querySelector('header');
+    window.addEventListener('scroll', () => {
+        header.classList.toggle('scrolled', window.scrollY > 20);
+    });
+
+    // Scroll-triggered reveal animations
+    const reveals = document.querySelectorAll('.reveal');
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('visible');
+                observer.unobserve(entry.target);
+            }
+        });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+    reveals.forEach(el => observer.observe(el));
+
+    // Product card tilt effect
+    document.querySelectorAll('.product-card').forEach(card => {
+        card.addEventListener('mousemove', (e) => {
+            const rect = card.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width - 0.5;
+            const y = (e.clientY - rect.top) / rect.height - 0.5;
+            card.style.transform = `translateY(-8px) rotateY(${x * 4}deg) rotateX(${-y * 4}deg)`;
+        });
+        card.addEventListener('mouseleave', () => { card.style.transform = ''; });
+    });
+
+    // Hamburger menu
+    const hamburger = document.querySelector('.hamburger');
+    const mobileNav = document.querySelector('.mobile-nav');
+    const mobileOverlay = document.querySelector('.mobile-overlay');
+    function closeMenu() {
+        hamburger.classList.remove('active');
+        hamburger.setAttribute('aria-expanded', 'false');
+        mobileNav.classList.remove('active');
+        mobileOverlay.classList.remove('active');
+    }
+    if (hamburger) {
+        hamburger.addEventListener('click', () => {
+            const isOpen = mobileNav.classList.contains('active');
+            if (isOpen) closeMenu();
+            else {
+                hamburger.classList.add('active');
+                hamburger.setAttribute('aria-expanded', 'true');
+                mobileNav.classList.add('active');
+                mobileOverlay.classList.add('active');
+            }
+        });
+        mobileOverlay.addEventListener('click', closeMenu);
+        mobileNav.querySelectorAll('a').forEach(a => a.addEventListener('click', closeMenu));
+    }
+
+    // Image lightbox
+    document.querySelectorAll('.product-img-lg, .product-image img').forEach(img => {
+        img.style.cursor = 'zoom-in';
+        img.addEventListener('click', () => {
+            const lb = document.createElement('div');
+            lb.className = 'lightbox';
+            lb.innerHTML = `<button class="lightbox-close" aria-label="Close">&times;</button><img src="${img.src}" alt="${img.alt}">`;
+            lb.addEventListener('click', (e) => { if (e.target === lb || e.target.classList.contains('lightbox-close')) lb.remove(); });
+            document.body.appendChild(lb);
+        });
+    });
+    </script>
+</body>
+</html>

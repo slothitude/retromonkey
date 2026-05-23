@@ -1,0 +1,16 @@
+{% extends "store/base.html" %}
+{% block title %}Order Confirmed — RetroMonkey{% endblock %}
+
+{% block content %}
+<div class="success-page">
+    <div class="success-icon">&#10003;</div>
+    <h1>Order Confirmed!</h1>
+    <p>Thank you for your order! You'll receive a confirmation email shortly.</p>
+    {% if session_id %}
+    <p class="session-id">Order ref: <code>{{ session_id[:20] }}...</code></p>
+    {% endif %}
+    <div class="success-actions">
+        <a href="/" class="btn btn-primary">Continue Shopping</a>
+    </div>
+</div>
+{% endblock %}

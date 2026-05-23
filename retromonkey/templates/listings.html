@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Listings - RetroMonkey{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Marketplace Listings</h1>
+    <button class="btn btn-primary">+ Create Listing</button>
+</div>
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+    <select id="filter-marketplace" name="marketplace"
+            hx-get="{{ url_for('pages.listings') }}"
+            hx-target="#listings-table-body"
+            hx-include="[name='status']">
+        <option value="">All Marketplaces</option>
+        {% for mp in marketplaces %}
+        <option value="{{ mp.id }}">{{ mp.name }}</option>
+        {% endfor %}
+    </select>
+    <select id="filter-status" name="status"
+            hx-get="{{ url_for('pages.listings') }}"
+            hx-target="#listings-table-body"
+            hx-include="[name='marketplace']">
+        <option value="">All Status</option>
+        <option value="draft">Draft</option>
+        <option value="active">Active</option>
+        <option value="ended">Ended</option>
+    </select>
+</div>
+
+<!-- Listings Table -->
+<div class="card">
+    <div class="card-body" style="padding:0;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Marketplace</th>
+                    <th>Price</th>
+                    <th>Status</th>
+                    <th>Views</th>
+                    <th>Sold</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="listings-table-body">
+                {% for listing in listings %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('pages.product_detail', product_id=listing.product_id) }}">
+                            {{ listing.product.title if listing.product else 'Product #' + listing.product_id|string }}
+                        </a>
+                        {% if listing.product and listing.title and listing.title != listing.product.title %}
+                        <br><span class="text-muted" style="font-size:11px;">{{ listing.title }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ listing.marketplace.name if listing.marketplace else '-' }}</td>
+                    <td>
+                        <input type="number" class="inline-edit"
+                               value="{{ '%.2f' | format(listing.price or 0) }}"
+                               step="0.01" min="0"
+                               hx-patch="{{ url_for('api.update_product', product_id=listing.product_id) }}"
+                               hx-trigger="change"
+                               hx-vals='js:{price: this.value}'
+                               hx-target="closest tr"
+                               hx-swap="none">
+                    </td>
+                    <td><span class="badge-status badge-{{ listing.status }}">{{ listing.status }}</span></td>
+                    <td>{{ listing.views | default(0) }}</td>
+                    <td>{{ listing.sold | default(0) }}</td>
+                    <td class="actions-col">
+                        {% if listing.status == 'active' or listing.status == 'live' %}
+                        <button class="btn btn-warning btn-sm"
+                                hx-post="#"
+                                hx-confirm="End this listing?"
+                                hx-target="closest tr"
+                                hx-swap="outerHTML">End</button>
+                        <button class="btn btn-secondary btn-sm"
+                                hx-post="#"
+                                hx-target="closest tr">Promote</button>
+                        {% elif listing.status == 'draft' %}
+                        <button class="btn btn-primary btn-sm"
+                                hx-post="{{ url_for('marketplace.ebay_list') }}"
+                                hx-target="closest tr">Publish</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted" style="padding:40px;">No listings yet. Add products first, then list them on marketplaces.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

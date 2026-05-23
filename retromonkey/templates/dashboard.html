@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - RetroMonkey{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Dashboard</h1>
+    <span class="text-muted">{{ stats.date_label | default('Today') }}</span>
+</div>
+
+<!-- KPI Cards -->
+<div class="kpi-row">
+    <div class="kpi-card">
+        <span class="kpi-label">Active Listings</span>
+        <span class="kpi-value">{{ stats.active_listings | default(0) }}</span>
+    </div>
+    <div class="kpi-card">
+        <span class="kpi-label">Orders Today</span>
+        <span class="kpi-value">{{ stats.orders_today | default(0) }}</span>
+        <span class="kpi-change {{ 'positive' if stats.orders_change and stats.orders_change >= 0 else 'negative' }}">
+            {{ stats.orders_change | default('') }}
+        </span>
+    </div>
+    <div class="kpi-card">
+        <span class="kpi-label">Revenue Today</span>
+        <span class="kpi-value">${{ stats.revenue_today | default('0.00') }}</span>
+    </div>
+    <div class="kpi-card">
+        <span class="kpi-label">Pending Shipments</span>
+        <span class="kpi-value">{{ stats.pending_shipments | default(0) }}</span>
+    </div>
+    <div class="kpi-card">
+        <span class="kpi-label">Low Stock Alerts</span>
+        <span class="kpi-value {{ 'text-danger' if stats.low_stock and stats.low_stock > 0 }}">
+            {{ stats.low_stock | default(0) }}
+        </span>
+    </div>
+</div>
+
+<!-- Dashboard Grid -->
+<div class="dashboard-grid">
+    <div class="card">
+        <div class="card-header">
+            <h3>Revenue (Last 30 Days)</h3>
+        </div>
+        <div class="card-body">
+            <div class="chart-container">
+                <canvas id="revenueChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>System Status</h3>
+        </div>
+        <div class="card-body">
+            <div class="detail-fields">
+                <dt>eBay</dt>
+                <dd><span class="badge-status badge-{{ 'active' if stats.ebay_connected else 'pending' }}">{{ 'Connected' if stats.ebay_connected else 'Not Connected' }}</span></dd>
+
+                <dt>Amazon</dt>
+                <dd><span class="badge-status badge-{{ 'active' if stats.amazon_connected else 'pending' }}">{{ 'Connected' if stats.amazon_connected else 'Not Connected' }}</span></dd>
+
+                <dt>Inventory Sync</dt>
+                <dd><span class="badge-status badge-active">{{ stats.last_sync | default('Never') }}</span></dd>
+
+                <dt>LLM Router</dt>
+                <dd><span class="badge-status badge-active">{{ stats.llm_mode | default('rule') }}</span></dd>
+
+                <dt>Total Products</dt>
+                <dd>{{ stats.total_products | default(0) }}</dd>
+
+                <dt>Total Orders</dt>
+                <dd>{{ stats.total_orders | default(0) }}</dd>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Orders -->
+<div class="card">
+    <div class="card-header">
+        <h3>Recent Orders</h3>
+        <a href="{{ url_for('pages.order_list') }}" class="btn btn-secondary btn-sm">View All</a>
+    </div>
+    <div class="card-body">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Order #</th>
+                    <th>Marketplace</th>
+                    <th>Buyer</th>
+                    <th>Items</th>
+                    <th>Total</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in recent_orders %}
+                <tr>
+                    <td><a href="{{ url_for('pages.order_detail', order_id=order.id) }}">{{ order.external_order_id or order.id }}</a></td>
+                    <td>{{ order.marketplace.name if order.marketplace else '-' }}</td>
+                    <td>{{ order.buyer_name or '-' }}</td>
+                    <td>{{ order.items | length }}</td>
+                    <td>${{ "%.2f" | format(order.total or 0) }}</td>
+                    <td><span class="badge-status badge-{{ order.status }}">{{ order.status }}</span></td>
+                    <td>{{ order.ordered_at.strftime('%b %d, %H:%M') if order.ordered_at else '-' }}</td>
+                    <td class="actions-col">
+                        <a href="{{ url_for('pages.order_detail', order_id=order.id) }}" class="btn btn-secondary btn-sm">View</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="text-center text-muted">No orders yet</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var ctx = document.getElementById('revenueChart');
+    if (!ctx) return;
+
+    var labels = [];
+    var data = [];
+    {% for point in chart_data | default([]) %}
+    labels.push('{{ point.date }}');
+    data.push({{ point.amount }});
+    {% endfor %}
+
+    if (labels.length === 0) {
+        // Sample data structure for when no real data exists
+        var today = new Date();
+        for (var i = 29; i >= 0; i--) {
+            var d = new Date(today);
+            d.setDate(d.getDate() - i);
+            labels.push(d.toLocaleDateString('en', { month: 'short', day: 'numeric' }));
+            data.push(0);
+        }
+    }
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Revenue ($)',
+                data: data,
+                borderColor: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(),
+                backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() + '20',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 2,
+                pointHoverRadius: 5
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(128,128,128,0.1)' },
+                    ticks: { maxTicksLimit: 8, color: '#888' }
+                },
+                y: {
+                    grid: { color: 'rgba(128,128,128,0.1)' },
+                    ticks: { color: '#888', callback: function(v) { return '$' + v; } }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

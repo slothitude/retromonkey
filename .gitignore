@@ -1,0 +1,25 @@
+# Secrets
+.env
+.env.*
+
+# Database
+*.db
+*.db.bak
+instance/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.claude/
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Plans (local only)
+plans/

@@ -1,0 +1,57 @@
+name: return_handler
+description: >
+  Handle product return requests: classify severity, acknowledge the
+  customer, and escalate high-severity cases.
+trigger:
+  event: return_requested
+
+actions:
+  - type: call_llm
+    mode: auto
+    prompt: >
+      You are a customer service triage agent. Classify this return request:
+
+      Order: {{order_id}}
+      Product: {{product_title}}
+      Reason: {{return_reason}}
+      Message: {{customer_message}}
+
+      Respond with JSON:
+      {"severity": "low|medium|high", "refund_type": "full|partial|replacement", "escalate": true|false}
+    max_tokens: 128
+
+  - type: send_email
+    to: "{{buyer_email}}"
+    subject: "Return Request Received - Order #{{order_id}}"
+    body: >
+      Hi {{buyer_name}},
+
+      We've received your return request for order #{{order_id}}.
+
+      We're sorry to hear about the issue. Our team will review your request
+      within 24 hours and send you a prepaid return label if applicable.
+
+      Reference: RET-{{order_id}}
+
+      Best regards,
+      RetroMonkey Customer Service
+
+  - type: condition
+    field: escalate
+    operator: "=="
+    value: "true"
+    then:
+      type: notify
+      channel: dashboard
+      level: warning
+      message: "ESCALATED return for order #{{order_id}}: {{return_reason}}"
+    else:
+      type: notify
+      channel: dashboard
+      level: info
+      message: "Return request processed for order #{{order_id}}"
+
+  - type: log_event
+    channel: system
+    subject: "Return request"
+    message: "Return requested for order #{{order_id}}: {{return_reason}}"

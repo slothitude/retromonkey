@@ -1,0 +1,44 @@
+{% extends "store/base.html" %}
+{% block title %}Search: {{ query }} — RetroMonkey{% endblock %}
+
+{% block content %}
+<div class="search-page">
+    <h1>Search Results for "{{ query }}"</h1>
+
+    {% if products %}
+    <p class="result-count">{{ products|length }} product{{ 's' if products|length != 1 }} found</p>
+    <div class="product-grid">
+        {% for p in products %}
+        <a href="/product/{{ p.slug or p.id }}" class="product-card{% if p.badge %} has-badge{% endif %}">
+            {% if p.badge %}
+            <span class="badge">{{ p.badge }}</span>
+            {% endif %}
+            <div class="product-image">
+                {% if p.main_image %}
+                <img src="{{ p.main_image }}" alt="{{ p.title }}" class="product-img" loading="lazy">
+                {% else %}
+                <div class="product-placeholder"><span>{{ p.title[0:2] }}</span></div>
+                {% endif %}
+            </div>
+            <div class="product-info">
+                <h3>{{ p.title }}</h3>
+                {% if p.tagline %}
+                <p class="tagline">{{ p.tagline }}</p>
+                {% endif %}
+                <div class="price-row">
+                    {% if p.price %}
+                    <span class="price">${{ "%.2f"|format(p.price) }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No products found matching "{{ query }}".</p>
+        <a href="/" class="btn btn-primary">Browse All Products</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

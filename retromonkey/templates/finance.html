@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+
+{% block title %}Finance - RetroMonkey{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Finance</h1>
+    <div class="flex" style="gap:10px;">
+        <div class="period-selector">
+            <button class="btn btn-sm {{ 'btn-primary' if period == '7d' else 'btn-secondary' }}"
+                    hx-get="{{ url_for('pages.finance') }}?period=7d"
+                    hx-target="#finance-content">7D</button>
+            <button class="btn btn-sm {{ 'btn-primary' if period == '30d' else 'btn-secondary' }}"
+                    hx-get="{{ url_for('pages.finance') }}?period=30d"
+                    hx-target="#finance-content">30D</button>
+            <button class="btn btn-sm {{ 'btn-primary' if period == '90d' else 'btn-secondary' }}"
+                    hx-get="{{ url_for('pages.finance') }}?period=90d"
+                    hx-target="#finance-content">90D</button>
+            <button class="btn btn-sm {{ 'btn-primary' if period == 'all' else 'btn-secondary' }}"
+                    hx-get="{{ url_for('pages.finance') }}?period=all"
+                    hx-target="#finance-content">All</button>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="exportFinance()">Export CSV</button>
+        <button class="btn btn-secondary btn-sm" onclick="exportFinancePDF()">Export PDF</button>
+    </div>
+</div>
+
+<div id="finance-content">
+<!-- KPI Cards -->
+<div class="kpi-row">
+    <div class="kpi-card">
+        <span class="kpi-label">Revenue</span>
+        <span class="kpi-value">${{ "%.2f" | format(stats.revenue | default(0)) }}</span>
+    </div>
+    <div class="kpi-card">
+        <span class="kpi-label">Profit</span>
+        <span class="kpi-value {{ 'text-success' if stats.profit and stats.profit >= 0 else 'text-danger' }}">${{ "%.2f" | format(stats.profit | default(0)) }}</span>
+    </div>
+    <div class="kpi-card">
+        <span class="kpi-label">Margin</span>
+        <span class="kpi-value">{{ "%.1f" | format(stats.margin | default(0)) }}%</span>
+    </div>
+    <div class="kpi-card">
+        <span class="kpi-label">Total Fees</span>
+        <span class="kpi-value text-danger">${{ "%.2f" | format(stats.total_fees | default(0)) }}</span>
+    </div>
+</div>
+
+<!-- Charts -->
+<div class="finance-charts">
+    <div class="card">
+        <div class="card-header">
+            <h3>Revenue & Profit</h3>
+        </div>
+        <div class="card-body">
+            <div class="chart-container">
+                <canvas id="revenueProfitChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Fee Breakdown</h3>
+        </div>
+        <div class="card-body">
+            <div class="chart-container">
+                <canvas id="feeBreakdownChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Top Products -->
+<div class="card">
+    <div class="card-header">
+        <h3>Top Products by Profit</h3>
+    </div>
+    <div class="card-body" style="padding:0;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Sold</th>
+                    <th>Revenue</th>
+                    <th>Cost</th>
+                    <th>Fees</th>
+                    <th>Profit</th>
+                    <th>Margin</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in top_products %}
+                <tr>
+                    <td><a href="{{ url_for('pages.product_detail', product_id=item.product_id) }}">{{ item.title }}</a></td>
+                    <td>{{ item.sold }}</td>
+                    <td>${{ "%.2f" | format(item.revenue) }}</td>
+                    <td>${{ "%.2f" | format(item.cost) }}</td>
+                    <td>${{ "%.2f" | format(item.fees) }}</td>
+                    <td class="{{ 'text-success' if item.profit >= 0 else 'text-danger' }}">${{ "%.2f" | format(item.profit) }}</td>
+                    <td>{{ "%.1f" | format(item.margin) }}%</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted" style="padding:40px;">No sales data yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Revenue & Profit Chart
+    var rpCtx = document.getElementById('revenueProfitChart');
+    if (rpCtx) {
+        var rpLabels = [];
+        var rpRevenue = [];
+        var rpProfit = [];
+        {% for point in revenue_chart_data | default([]) %}
+        rpLabels.push('{{ point.date }}');
+        rpRevenue.push({{ point.revenue }});
+        rpProfit.push({{ point.profit }});
+        {% endfor %}
+
+        if (rpLabels.length === 0) {
+            var today = new Date();
+            for (var i = 29; i >= 0; i--) {
+                var d = new Date(today);
+                d.setDate(d.getDate() - i);
+                rpLabels.push(d.toLocaleDateString('en', { month: 'short', day: 'numeric' }));
+                rpRevenue.push(0);
+                rpProfit.push(0);
+            }
+        }
+
+        new Chart(rpCtx, {
+            type: 'bar',
+            data: {
+                labels: rpLabels,
+                datasets: [
+                    {
+                        label: 'Revenue',
+                        data: rpRevenue,
+                        backgroundColor: 'rgba(108, 92, 231, 0.6)',
+                        borderColor: 'rgba(108, 92, 231, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Profit',
+                        data: rpProfit,
+                        backgroundColor: 'rgba(0, 184, 148, 0.6)',
+                        borderColor: 'rgba(0, 184, 148, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'top' } },
+                scales: {
+                    x: { grid: { color: 'rgba(128,128,128,0.1)' }, ticks: { maxTicksLimit: 10, color: '#888' } },
+                    y: { grid: { color: 'rgba(128,128,128,0.1)' }, ticks: { color: '#888', callback: function(v) { return '$' + v; } } }
+                }
+            }
+        });
+    }
+
+    // Fee Breakdown Donut
+    var fbCtx = document.getElementById('feeBreakdownChart');
+    if (fbCtx) {
+        var fbLabels = [];
+        var fbData = [];
+        {% for fee in fee_breakdown | default([]) %}
+        fbLabels.push('{{ fee.type }}');
+        fbData.push({{ fee.amount }});
+        {% endfor %}
+
+        if (fbLabels.length === 0) {
+            fbLabels = ['eBay Fees', 'Shipping', 'Payment Processing', 'Other'];
+            fbData = [0, 0, 0, 0];
+        }
+
+        new Chart(fbCtx, {
+            type: 'doughnut',
+            data: {
+                labels: fbLabels,
+                datasets: [{
+                    data: fbData,
+                    backgroundColor: [
+                        'rgba(108, 92, 231, 0.7)',
+                        'rgba(0, 184, 148, 0.7)',
+                        'rgba(225, 112, 85, 0.7)',
+                        'rgba(116, 185, 255, 0.7)'
+                    ],
+                    borderWidth: 2,
+                    borderColor: getComputedStyle(document.documentElement).getPropertyValue('--bg-card').trim()
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right' },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                return ctx.label + ': $' + ctx.parsed.toFixed(2);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+});
+
+function exportFinance() {
+    var params = new URLSearchParams(window.location.search);
+    window.location.href = '/api/finance/export/csv?' + params.toString();
+}
+
+function exportFinancePDF() {
+    var params = new URLSearchParams(window.location.search);
+    window.location.href = '/api/finance/export/pdf?' + params.toString();
+}
+</script>
+{% endblock %}

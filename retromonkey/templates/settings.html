@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - RetroMonkey{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Settings</h1>
+</div>
+
+<div class="tabs-wrapper">
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="tab-marketplaces">Marketplaces</button>
+        <button class="tab-btn" data-tab="tab-ai">AI Config</button>
+        <button class="tab-btn" data-tab="tab-workflows">Workflows</button>
+        <button class="tab-btn" data-tab="tab-notifications">Notifications</button>
+        <button class="tab-btn" data-tab="tab-reorder">Reorder Thresholds</button>
+    </div>
+
+    <!-- Tab: Marketplaces -->
+    <div class="tab-content active" id="tab-marketplaces">
+        <div class="detail-grid">
+            <div class="detail-section">
+                <h3>eBay</h3>
+                <dl class="detail-fields">
+                    <dt>Status</dt>
+                    <dd>
+                        {% if ebay_connected %}
+                        <span class="badge-status badge-active">Connected</span>
+                        {% else %}
+                        <span class="badge-status badge-pending">Not Connected</span>
+                        {% endif %}
+                    </dd>
+
+                    <dt>Auth URL</dt>
+                    <dd><a href="{{ url_for('marketplace.ebay_auth_url') }}">Authorize eBay</a></dd>
+
+                    <dt>Environment</dt>
+                    <dd>{{ ebay_env | default('Sandbox') }}</dd>
+                </dl>
+                <div class="mt-2">
+                    <button class="btn btn-secondary btn-sm"
+                            hx-post="{{ url_for('marketplace.ebay_auth_url') }}"
+                            hx-target="closest .detail-section">Re-authenticate</button>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <h3>Amazon</h3>
+                <dl class="detail-fields">
+                    <dt>Status</dt>
+                    <dd>
+                        {% if amazon_connected %}
+                        <span class="badge-status badge-active">Connected</span>
+                        {% else %}
+                        <span class="badge-status badge-pending">Not Connected</span>
+                        {% endif %}
+                    </dd>
+
+                    <dt>Region</dt>
+                    <dd>{{ amazon_region | default('Australia') }}</dd>
+                </dl>
+                <div class="mt-2">
+                    <button class="btn btn-secondary btn-sm"
+                            hx-post="#"
+                            hx-target="closest .detail-section">Connect Amazon</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="detail-section mt-2">
+            <h3>Kogan</h3>
+            <dl class="detail-fields">
+                <dt>Status</dt>
+                <dd><span class="badge-status badge-pending">Not Connected</span></dd>
+            </dl>
+        </div>
+    </div>
+
+    <!-- Tab: AI Config -->
+    <div class="tab-content" id="tab-ai">
+        <div class="detail-section">
+            <h3>LLM Router Configuration</h3>
+            <form hx-post="#" hx-target="#ai-save-status">
+                <div class="form-group">
+                    <label>Default LLM Mode</label>
+                    <select name="llm_mode">
+                        <option value="rule" {% if llm_mode == 'rule' %}selected{% endif %}>Rule Engine (Free, Deterministic)</option>
+                        <option value="ollama" {% if llm_mode == 'ollama' %}selected{% endif %}>Ollama / Local (~$0.50/day)</option>
+                        <option value="claude" {% if llm_mode == 'claude' %}selected{% endif %}>Claude API (~$2-3/day)</option>
+                        <option value="auto" {% if llm_mode == 'auto' %}selected{% endif %}>Auto (Route by complexity)</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Claude API Key</label>
+                        <input type="password" name="claude_api_key"
+                               value="{{ claude_api_key | default('') }}"
+                               placeholder="sk-ant-...">
+                    </div>
+                    <div class="form-group">
+                        <label>Ollama Endpoint</label>
+                        <input type="text" name="ollama_endpoint"
+                               value="{{ ollama_endpoint | default('http://localhost:11434') }}"
+                               placeholder="http://localhost:11434">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Ollama Model</label>
+                        <input type="text" name="ollama_model"
+                               value="{{ ollama_model | default('qwen3') }}"
+                               placeholder="qwen3">
+                    </div>
+                    <div class="form-group">
+                        <label>Fallback Chain</label>
+                        <select name="fallback_mode">
+                            <option value="claude_ollama_rule">Claude -> Ollama -> Rule</option>
+                            <option value="ollama_rule">Ollama -> Rule</option>
+                            <option value="rule_only">Rule Only (No AI)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Save AI Settings</button>
+                <span id="ai-save-status" class="ml-1"></span>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tab: Workflows -->
+    <div class="tab-content" id="tab-workflows">
+        <div class="detail-section">
+            <h3>Automation Workflows</h3>
+            <p class="text-muted mb-2" style="font-size:13px;">Enable or disable automated workflows. Disabled workflows will not trigger on events.</p>
+
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Workflow</th>
+                        <th>Trigger</th>
+                        <th>Action</th>
+                        <th>Enabled</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for wf in workflows | default([]) %}
+                    <tr>
+                        <td>{{ wf.name }}</td>
+                        <td><code>{{ wf.trigger }}</code></td>
+                        <td>{{ wf.action }}</td>
+                        <td>
+                            <label class="toggle-switch">
+                                <input type="checkbox" name="workflow_{{ wf.id }}" {% if wf.enabled %}checked{% endif %}
+                                       hx-post="#"
+                                       hx-vals='{"workflow_id": "{{ wf.id }}"}'
+                                       hx-trigger="change">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td>Auto Ship</td>
+                        <td><code>tracking_added</code></td>
+                        <td>Mark order as shipped on marketplace</td>
+                        <td>
+                            <label class="toggle-switch">
+                                <input type="checkbox" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Low Stock Reorder</td>
+                        <td><code>low_stock</code></td>
+                        <td>Generate reorder suggestion</td>
+                        <td>
+                            <label class="toggle-switch">
+                                <input type="checkbox" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>AI Message Reply</td>
+                        <td><code>message_received</code></td>
+                        <td>Generate AI draft reply</td>
+                        <td>
+                            <label class="toggle-switch">
+                                <input type="checkbox">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Dynamic Pricing</td>
+                        <td><code>price_check</code></td>
+                        <td>Adjust listing prices based on market data</td>
+                        <td>
+                            <label class="toggle-switch">
+                                <input type="checkbox">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Tab: Notifications -->
+    <div class="tab-content" id="tab-notifications">
+        <div class="detail-section">
+            <h3>Alert Preferences</h3>
+            <p class="text-muted mb-2" style="font-size:13px;">Choose which events trigger notifications.</p>
+
+            <form hx-post="#" hx-target="#notif-save-status">
+                <div style="display:flex;flex-direction:column;gap:12px;">
+                    <label style="display:flex;align-items:center;gap:10px;font-size:13px;">
+                        <input type="checkbox" name="notif_new_order" checked>
+                        New order received
+                    </label>
+                    <label style="display:flex;align-items:center;gap:10px;font-size:13px;">
+                        <input type="checkbox" name="notif_shipment" checked>
+                        Shipment delivered
+                    </label>
+                    <label style="display:flex;align-items:center;gap:10px;font-size:13px;">
+                        <input type="checkbox" name="notif_low_stock" checked>
+                        Low stock alert
+                    </label>
+                    <label style="display:flex;align-items:center;gap:10px;font-size:13px;">
+                        <input type="checkbox" name="notif_message">
+                        New message from buyer
+                    </label>
+                    <label style="display:flex;align-items:center;gap:10px;font-size:13px;">
+                        <input type="checkbox" name="notif_price_change">
+                        Competitor price change
+                    </label>
+                    <label style="display:flex;align-items:center;gap:10px;font-size:13px;">
+                        <input type="checkbox" name="notif_rfq_response">
+                        RFQ response received
+                    </label>
+                    <label style="display:flex;align-items:center;gap:10px;font-size:13px;">
+                        <input type="checkbox" name="notif_daily_summary">
+                        Daily summary report
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-primary mt-2">Save Notifications</button>
+                <span id="notif-save-status" class="ml-1"></span>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tab: Reorder Thresholds -->
+    <div class="tab-content" id="tab-reorder">
+        <div class="detail-section">
+            <h3>Reorder Thresholds</h3>
+            <p class="text-muted mb-2" style="font-size:13px;">Set the stock level at which a reorder alert is triggered for each product.</p>
+
+            <form hx-post="#" hx-target="#threshold-save-status">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>SKU</th>
+                            <th>Current Stock</th>
+                            <th>Threshold</th>
+                            <th>Reorder Qty</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for product in products_with_inventory | default([]) %}
+                        <tr>
+                            <td>{{ product.title }}</td>
+                            <td style="font-family:monospace;font-size:12px;">{{ product.sku }}</td>
+                            <td>{{ product.inventory.quantity_on_hand }}</td>
+                            <td>
+                                <input type="number" name="threshold_{{ product.id }}"
+                                       value="{{ product.inventory.reorder_threshold }}" min="0"
+                                       style="width:70px;padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text-primary);">
+                            </td>
+                            <td>
+                                <input type="number" name="reorder_qty_{{ product.id }}"
+                                       value="{{ product.inventory.reorder_qty or '' }}" min="0"
+                                       style="width:70px;padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text-primary);">
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">No products with inventory yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <button type="submit" class="btn btn-primary mt-2">Save Thresholds</button>
+                <span id="threshold-save-status" class="ml-1"></span>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
