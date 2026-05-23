@@ -98,6 +98,100 @@ def gmail_messages():
         return jsonify({"error": str(e)}), 400
 
 
+@intelligence_bp.route("/gmail/label", methods=["POST"])
+def gmail_label():
+    """POST /api/intelligence/gmail/label — Apply a label to a message.
+
+    Body: {"message_id": "...", "label_name": "..."}
+    """
+    data = request.json or {}
+    message_id = data.get("message_id")
+    label_name = data.get("label_name")
+    if not message_id or not label_name:
+        return jsonify({"error": "message_id and label_name are required"}), 400
+
+    from retromonkey.services.gmail_client import GmailClient
+    gmail = GmailClient(db)
+
+    try:
+        result = gmail.apply_label(message_id, label_name)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@intelligence_bp.route("/gmail/mark-read", methods=["POST"])
+def gmail_mark_read():
+    """POST /api/intelligence/gmail/mark-read — Mark a message as read.
+
+    Body: {"message_id": "..."}
+    """
+    data = request.json or {}
+    message_id = data.get("message_id")
+    if not message_id:
+        return jsonify({"error": "message_id is required"}), 400
+
+    from retromonkey.services.gmail_client import GmailClient
+    gmail = GmailClient(db)
+
+    try:
+        service = gmail._get_service()
+        service.users().messages().modify(
+            userId="me", id=message_id,
+            body={"removeLabelIds": ["UNREAD"]}
+        ).execute()
+        return jsonify({"status": "read", "message_id": message_id})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@intelligence_bp.route("/gmail/poll", methods=["POST"])
+def gmail_poll():
+    """POST /api/intelligence/gmail/poll — Poll for new emails, categorize, and return unread.
+
+    Body: {"max_results": 10} (optional)
+    """
+    max_results = (request.json or {}).get("max_results", 10)
+
+    from retromonkey.services.gmail_client import GmailClient
+    gmail = GmailClient(db)
+
+    try:
+        messages = gmail.list_messages(query="is:unread", max_results=max_results)
+        categorized = []
+
+        for msg in messages:
+            sender = msg.get("from", "").lower()
+            subject = msg.get("subject", "").lower()
+            category = "general"
+
+            if "ebay" in sender:
+                if "listed" in subject or "listing" in subject:
+                    category = "ebay-listing"
+                elif "sold" in subject or "order" in subject or "purchase" in subject:
+                    category = "ebay-order"
+                elif "payment" in subject or "payout" in subject:
+                    category = "ebay-payment"
+                else:
+                    category = "ebay-account"
+            elif "stripe" in sender:
+                category = "stripe"
+            elif "amazon" in sender:
+                category = "amazon"
+            elif "nvidia" in sender:
+                category = "nvidia"
+            elif "google" in sender:
+                category = "security"
+            elif "improvmx" in sender:
+                category = "dns"
+
+            categorized.append({**msg, "category": category})
+
+        return jsonify({"messages": categorized, "count": len(categorized)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
 @intelligence_bp.route("/gmail/send", methods=["POST"])
 def gmail_send():
     """POST /api/intelligence/gmail/send — Send an email via Gmail.
