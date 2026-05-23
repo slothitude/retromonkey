@@ -433,7 +433,7 @@ def track_order():
     parsed = []
     for o in orders:
         items = json.loads(o.items_json) if o.items_json else []
-        parsed.append({"order": o, "items": items})
+        parsed.append({"order": o, "order_items": items})
 
     return render_template("store/track.html", results=parsed, query=query)
 

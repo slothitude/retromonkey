@@ -21,7 +21,7 @@
 
     {% for result in results %}
     {% set order = result.order %}
-    {% set items = result.items %}
+    {% set order_items = result.order_items %}
     <div class="track-result">
         <div class="track-header">
             <h2>Order #{{ order.id }}</h2>
@@ -52,7 +52,7 @@
         <table class="admin-table">
             <thead><tr><th>Item</th><th>Qty</th><th>Price</th></tr></thead>
             <tbody>
-                {% for item in items %}
+                {% for item in order_items %}
                 <tr>
                     <td>{{ item.name }}</td>
                     <td>{{ item.qty }}</td>
