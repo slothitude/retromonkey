@@ -46,11 +46,34 @@ def ebay_list():
     conn = _get_ebay_connector()
     if not conn:
         return jsonify({'error': 'eBay not configured'}), 400
+    # Collect images from product
+    images = []
+    if product.images:
+        if isinstance(product.images, list):
+            images = product.images[:12]
+        elif isinstance(product.images, str):
+            images = [x.strip() for x in product.images.split(',') if x.strip()][:12]
+
+    # Extract model from product title for eBay item specifics
+    model = product.title.split('Retro')[0].strip() if 'Retro' in product.title else product.title.split('Handheld')[0].strip() if 'Handheld' in product.title else product.title
+    brand = 'Anbernic' if 'Anbernic' in product.title else 'Miyoo' if 'Miyoo' in product.title else 'Trimui' if 'Trimui' in product.title else 'Unbranded'
+
+    item_specifics = {
+        'Brand': [brand],
+        'Model': [model],
+        'MPN': [product.sku],
+        'Type': ['Handheld Console'],
+        'Condition': ['Brand New'],
+    }
+
     result = conn.list_item(product, {
         'title': product.title,
         'price': data['price'],
         'quantity': data['quantity'],
         'category_id': data.get('category_id'),
+        'images': images,
+        'condition': 'NEW',
+        'item_specifics': item_specifics,
     })
     mp = db.session.query(Marketplace).filter_by(name='eBay').first()
     listing = Listing(

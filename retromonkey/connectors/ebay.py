@@ -109,6 +109,7 @@ class EbayConnector(BaseConnector):
             'Authorization': f'Bearer {token}',
             'Content-Type': 'application/json',
             'Accept': 'application/json',
+            'Content-Language': 'en-AU',
         }
 
     def authenticate(self) -> dict:
@@ -136,9 +137,15 @@ class EbayConnector(BaseConnector):
                 },
                 'condition': listing_data.get('condition', 'NEW'),
                 'packageWeightAndSize': listing_data.get('package_info'),
+                'availability': {
+                    'shipToLocationAvailability': {
+                        'quantity': listing_data['quantity']
+                    }
+                },
             }
         )
-        resp.raise_for_status()
+        if resp.status_code >= 400:
+            raise Exception(f"eBay inventory error {resp.status_code}: {resp.text[:500]}")
 
         # Step 2: Create Offer
         self._rate_limit('offer')
@@ -152,6 +159,7 @@ class EbayConnector(BaseConnector):
                 'listingDescription': product.description or listing_data['title'],
                 'availableQuantity': listing_data['quantity'],
                 'categoryId': listing_data.get('category_id'),
+                'merchantLocationKey': listing_data.get('merchant_location_key', 'merch_loc_1'),
                 'listingPolicies': listing_data.get('listing_policies', {
                     'paymentPolicyId': self.config.get('EBAY_PAYMENT_POLICY_ID', ''),
                     'returnPolicyId': self.config.get('EBAY_RETURN_POLICY_ID', ''),
@@ -162,7 +170,8 @@ class EbayConnector(BaseConnector):
                 }
             }
         )
-        offer_resp.raise_for_status()
+        if offer_resp.status_code >= 400:
+            raise Exception(f"eBay offer error {offer_resp.status_code}: {offer_resp.text[:500]}")
         offer_id = offer_resp.json()['offerId']
 
         # Step 3: Publish
@@ -171,7 +180,8 @@ class EbayConnector(BaseConnector):
             f"{self.base_url}/sell/inventory/v1/offer/{offer_id}/publish/",
             headers=self._headers()
         )
-        pub_resp.raise_for_status()
+        if pub_resp.status_code >= 400:
+            raise Exception(f"eBay publish error {pub_resp.status_code}: {pub_resp.text[:500]}")
         listing_id = pub_resp.json().get('listingId', '')
 
         return {
