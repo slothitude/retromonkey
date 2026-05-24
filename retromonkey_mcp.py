@@ -141,6 +141,16 @@ def svc_task():
     return TaskManager(db)
 
 
+def svc_alert():
+    from retromonkey.services.alert_service import AlertService
+    return AlertService(db, app.config)
+
+
+def svc_telegram():
+    from retromonkey.services.telegram_client import TelegramClient
+    return TelegramClient(app.config)
+
+
 # ---------------------------------------------------------------------------
 # Serialization helper
 # ---------------------------------------------------------------------------
@@ -179,7 +189,7 @@ def _ctx(func):
 
 
 # ===========================================================================
-# TOOL DEFINITIONS — 68 tools across 19 domains
+# TOOL DEFINITIONS — 76 tools across 21 domains
 # ===========================================================================
 TOOLS = [
     # ---- Health ----
@@ -559,6 +569,15 @@ TOOLS = [
          'label_name': {'type': 'string'}},
          'required': ['message_id', 'label_name']}},
 
+    {'name': 'gmail_watch_start', 'description': 'Start Gmail push notifications via Google Pub/Sub',
+     'inputSchema': {'type': 'object', 'properties': {}}},
+
+    {'name': 'gmail_watch_stop', 'description': 'Stop Gmail push notifications',
+     'inputSchema': {'type': 'object', 'properties': {}}},
+
+    {'name': 'gmail_watch_status', 'description': 'Check if Gmail Pub/Sub watch is configured and enabled',
+     'inputSchema': {'type': 'object', 'properties': {}}},
+
     # ---- Tasks ----
     {'name': 'task_list', 'description': 'List tasks with filters (status, category, days)',
      'inputSchema': {'type': 'object', 'properties': {
@@ -584,6 +603,35 @@ TOOLS = [
      'inputSchema': {'type': 'object', 'properties': {}}},
 
     {'name': 'task_summary', 'description': 'Get daily summary (completed, pending, overdue counts)',
+     'inputSchema': {'type': 'object', 'properties': {}}},
+
+    # ---- Alerts ----
+    {'name': 'alert_send', 'description': 'Send a custom alert to any configured channel (email and/or Telegram)',
+     'inputSchema': {'type': 'object', 'properties': {
+         'subject': {'type': 'string', 'description': 'Alert subject line'},
+         'body': {'type': 'string', 'description': 'Alert body text'}},
+         'required': ['subject', 'body']}},
+
+    {'name': 'alert_test', 'description': 'Send test alert to all configured channels',
+     'inputSchema': {'type': 'object', 'properties': {}}},
+
+    {'name': 'alert_config', 'description': 'Show alert channel configuration (email + Telegram status)',
+     'inputSchema': {'type': 'object', 'properties': {}}},
+
+    {'name': 'alert_daily_summary', 'description': 'Send daily summary alert now',
+     'inputSchema': {'type': 'object', 'properties': {}}},
+
+    # ---- Reports ----
+    {'name': 'report_morning_briefing', 'description': 'Send morning briefing (checklist, overnight orders, low stock) to all channels',
+     'inputSchema': {'type': 'object', 'properties': {}}},
+
+    {'name': 'report_weekly', 'description': 'Send weekly report (P&L, top sellers, stock, tasks) to all channels',
+     'inputSchema': {'type': 'object', 'properties': {}}},
+
+    {'name': 'report_daily_summary', 'description': 'Send enhanced daily summary with P&L, stock, and business plan data',
+     'inputSchema': {'type': 'object', 'properties': {}}},
+
+    {'name': 'telegram_setup_webhook', 'description': 'Register Telegram webhook URL',
      'inputSchema': {'type': 'object', 'properties': {}}},
 ]
 
@@ -784,6 +832,10 @@ HANDLERS = {
 
     'gmail_label': _ctx(lambda a: svc_gmail().apply_label(a['message_id'], a['label_name'])),
 
+    'gmail_watch_start': _ctx(lambda a: _gmail_watch_start()),
+    'gmail_watch_stop': _ctx(lambda a: svc_gmail().stop_watch()),
+    'gmail_watch_status': _ctx(lambda a: _gmail_watch_status()),
+
     # ---- Tasks ----
     'task_list': _ctx(lambda a: _task_list(a)),
 
@@ -799,12 +851,55 @@ HANDLERS = {
     'task_daily': _ctx(lambda a: svc_task().generate_daily_checklist()),
 
     'task_summary': _ctx(lambda a: svc_task().get_daily_summary()),
+
+    # ---- Alerts ----
+    'alert_send': _ctx(lambda a: svc_alert().send_alert(
+        subject=a['subject'], plain_text=a['body'])),
+
+    'alert_test': _ctx(lambda a: svc_alert().send_test_alert()),
+
+    'alert_config': _ctx(lambda a: {
+        'email': {
+            'address': app.config.get('ALERT_EMAIL', ''),
+            'configured': bool(app.config.get('SMTP_USER') or app.config.get('GOOGLE_CLIENT_ID')),
+        },
+        'telegram': {
+            'enabled': app.config.get('ALERT_TELEGRAM_ENABLED', False),
+            'bot_configured': bool(app.config.get('TELEGRAM_BOT_TOKEN')),
+            'chat_id_set': bool(app.config.get('TELEGRAM_CHAT_ID')),
+        },
+    }),
+
+    'alert_daily_summary': _ctx(lambda a: _alert_daily_summary()),
+
+    # ---- Reports ----
+    'report_morning_briefing': _ctx(lambda a: svc_alert().alert_morning_briefing()),
+    'report_weekly': _ctx(lambda a: svc_alert().alert_weekly_report()),
+    'report_daily_summary': _ctx(lambda a: _alert_daily_summary()),
+
+    'telegram_setup_webhook': _ctx(lambda a: svc_telegram().set_webhook(
+        f"{app.config.get('SITE_URL', 'https://retromonkey.com.au').rstrip('/')}/webhooks/telegram")),
 }
 
 
 # ===========================================================================
 # Helper functions for complex handlers
 # ===========================================================================
+def _gmail_watch_start():
+    topic = app.config.get('GOOGLE_PUBSUB_TOPIC', '')
+    if not topic:
+        raise ValueError('GOOGLE_PUBSUB_TOPIC not configured')
+    return svc_gmail().watch(topic)
+
+
+def _gmail_watch_status():
+    return {
+        'enabled': app.config.get('GOOGLE_GMAIL_WATCH_ENABLED', False),
+        'topic_configured': bool(app.config.get('GOOGLE_PUBSUB_TOPIC', '')),
+        'topic': app.config.get('GOOGLE_PUBSUB_TOPIC', ''),
+    }
+
+
 def _product_delete(product_id):
     product = db.session.get(Product, product_id)
     if not product:
@@ -955,6 +1050,14 @@ def _task_list(args):
             for t in tasks
         ],
     }
+
+
+def _alert_daily_summary():
+    from retromonkey.services.task_manager import TaskManager
+    tm = TaskManager(db)
+    summary = tm.get_daily_summary()
+    result = svc_alert().alert_daily_summary(summary)
+    return {'summary': summary, 'alert': result}
 
 
 # ===========================================================================

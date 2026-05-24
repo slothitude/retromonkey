@@ -321,6 +321,89 @@ class GmailClient:
         return new_label["id"]
 
     # ------------------------------------------------------------------
+    # Pub/Sub Watch
+    # ------------------------------------------------------------------
+
+    def watch(self, topic_name: str) -> dict:
+        """Register a Pub/Sub watch for inbox changes.
+
+        Gmail will publish to the given Cloud Pub/Sub topic whenever a new
+        message arrives in INBOX.  Watches expire after ~7 days and must be
+        renewed periodically.
+
+        Returns ``historyId`` and ``expiration`` from the Gmail API.
+        """
+        service = self._get_service()
+        result = service.users().watch(
+            userId="me",
+            body={"topicName": topic_name, "labelIds": ["INBOX"]},
+        ).execute()
+        logger.info("Gmail watch registered: historyId=%s expires=%s",
+                     result.get("historyId"), result.get("expiration"))
+        return result
+
+    def stop_watch(self) -> dict:
+        """Stop the current Gmail Pub/Sub watch."""
+        service = self._get_service()
+        service.users().stop(userId="me").execute()
+        logger.info("Gmail watch stopped")
+        return {"status": "stopped"}
+
+    def get_messages_from_history(self, history_id: str) -> list[dict]:
+        """Fetch messages added since the given history ID.
+
+        Uses ``users.history.list`` to find newly-added messages and then
+        fetches metadata for each one, returning the same summary format as
+        :meth:`list_messages`.
+        """
+        service = self._get_service()
+        added = []
+        page_token = None
+
+        while True:
+            params = {
+                "userId": "me",
+                "startHistoryId": history_id,
+                "historyTypes": ["messageAdded"],
+            }
+            if page_token:
+                params["pageToken"] = page_token
+
+            resp = service.users().history().list(**params).execute()
+            for record in resp.get("history", []):
+                for msg_add in record.get("messagesAdded", []):
+                    msg = msg_add.get("message", {})
+                    msg_id = msg.get("id")
+                    if not msg_id:
+                        continue
+                    # Skip drafts / sent
+                    if "DRAFT" in msg.get("labelIds", []) or "SENT" in msg.get("labelIds", []):
+                        continue
+                    try:
+                        detail = service.users().messages().get(
+                            userId="me", id=msg_id, format="metadata",
+                            metadataHeaders=["From", "Subject", "Date"],
+                        ).execute()
+                        headers = {h["name"]: h["value"] for h in detail.get("payload", {}).get("headers", [])}
+                        added.append({
+                            "id": msg_id,
+                            "thread_id": detail.get("threadId"),
+                            "from": headers.get("From", ""),
+                            "subject": headers.get("Subject", ""),
+                            "date": headers.get("Date", ""),
+                            "snippet": detail.get("snippet", ""),
+                            "label_ids": detail.get("labelIds", []),
+                        })
+                    except Exception as exc:
+                        logger.warning("Failed to fetch history message %s: %s", msg_id, exc)
+
+            page_token = resp.get("nextPageToken")
+            if not page_token:
+                break
+
+        return added
+
+    # ------------------------------------------------------------------
     # Token persistence
     # ------------------------------------------------------------------
 

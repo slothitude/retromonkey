@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}RetroMonkey{% endblock %}</title>
+    <title>{% block title %}{{ config.STORE_NAME }}{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
     <script src="https://unpkg.com/htmx.org@1.9"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
@@ -12,7 +12,7 @@
     <aside class="sidebar">
         <div class="sidebar-brand">
             <span class="brand-icon">&#128018;</span>
-            <span class="brand-text">RetroMonkey</span>
+            <span class="brand-text">{{ config.STORE_NAME }}</span>
         </div>
         <nav class="sidebar-nav">
             <a href="{{ url_for('pages.dashboard') }}" class="nav-item {% if page == 'dashboard' %}active{% endif %}">

@@ -4,21 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="/static/images/favicon.png">
-    <title>{% block title %}RetroMonkey{% endblock %}</title>
-    <meta name="description" content="{% block meta_description %}RetroMonkey — Australia's retro gaming handheld store. Free shipping over $50. Secure checkout.{% endblock %}">
+    <title>{% block title %}{{ config.STORE_NAME }}{% endblock %}</title>
+    <meta name="description" content="{% block meta_description %}{{ config.STORE_NAME }} — {{ config.STORE_TAGLINE }}. Free shipping over $50. Secure checkout.{% endblock %}">
     <link rel="canonical" href="{{ config.SITE_URL }}{{ request.path }}">
 
     <!-- Open Graph -->
-    <meta property="og:site_name" content="RetroMonkey">
-    <meta property="og:title" content="{% block og_title %}RetroMonkey — Retro Gaming Handhelds{% endblock %}">
-    <meta property="og:description" content="{% block og_description %}Australia's retro gaming handheld store. Free shipping over $50.{% endblock %}">
+    <meta property="og:site_name" content="{{ config.STORE_NAME }}">
+    <meta property="og:title" content="{% block og_title %}{{ config.STORE_NAME }} — {{ config.STORE_TAGLINE }}{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}{{ config.STORE_TAGLINE }}. Free shipping over $50.{% endblock %}">
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ request.url }}">
     <meta property="og:image" content="{% block og_image %}{{ config.SITE_URL }}/static/images/og-banner.webp{% endblock %}">
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="{% block tw_title %}RetroMonkey — Retro Gaming Handhelds{% endblock %}">
+    <meta name="twitter:title" content="{% block tw_title %}{{ config.STORE_NAME }} — {{ config.STORE_TAGLINE }}{% endblock %}">
 
     <link rel="stylesheet" href="/static/css/store.css">
 
@@ -27,9 +27,9 @@
     {
         "@context": "https://schema.org",
         "@type": "Organization",
-        "name": "RetroMonkey",
+        "name": "{{ config.STORE_NAME }}",
         "url": "{{ config.SITE_URL }}",
-        "description": "Australia's retro gaming handheld store.",
+        "description": "{{ config.STORE_TAGLINE }}",
         "address": { "@type": "PostalAddress", "addressCountry": "AU" }
     }
     </script>
@@ -40,7 +40,7 @@
     <header>
         <div class="header-inner">
             <a href="/" class="logo">
-                <img src="/static/images/logo.png" alt="RetroMonkey" class="logo-img">
+                <img src="{{ config.STORE_LOGO }}" alt="{{ config.STORE_NAME }}" class="logo-img">
             </a>
             <nav>
                 <form class="nav-search" action="/search" method="GET">
@@ -97,8 +97,8 @@
     <footer>
         <div class="footer-inner">
             <div class="footer-col">
-                <h4>RetroMonkey</h4>
-                <p>Australia's retro gaming handheld store. Pre-loaded with thousands of classic games.</p>
+                <h4>{{ config.STORE_NAME }}</h4>
+                <p>{{ config.STORE_TAGLINE }}</p>
                 {% if config.ABN %}<p class="abn">ABN: {{ config.ABN }}</p>{% endif %}
             </div>
             <div class="footer-col">
@@ -109,11 +109,11 @@
             </div>
         </div>
         <div class="footer-strip">
-            <img src="/static/images/footer-strip.webp" alt="RetroMonkey">
+            <img src="/static/images/footer-strip.webp" alt="{{ config.STORE_NAME }}">
             <div class="footer-strip-overlay"></div>
         </div>
         <div class="footer-bottom">
-            <p>&copy; 2026 RetroMonkey. All rights reserved. All prices include GST where applicable.{% if config.ABN %} ABN: {{ config.ABN }}.{% endif %}</p>
+            <p>&copy; 2026 {{ config.STORE_NAME }}. All rights reserved. All prices include GST where applicable.{% if config.ABN %} ABN: {{ config.ABN }}.{% endif %}</p>
         </div>
     </footer>
 

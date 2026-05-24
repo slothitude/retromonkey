@@ -203,6 +203,25 @@ class EbayConnector(BaseConnector):
 
     def update_listing(self, listing, update_data: dict) -> dict:
         offer_id = listing.external_id
+
+        # If quantity is being updated, also update the inventory item
+        qty = update_data.get('availableQuantity')
+        if qty is not None:
+            sku = listing.product.sku if listing.product else None
+            if sku:
+                self._rate_limit('inventory_item_update')
+                http_requests.put(
+                    f"{self.base_url}/sell/inventory/v1/inventory_item/{sku}",
+                    headers=self._headers(),
+                    json={
+                        'availability': {
+                            'shipToLocationAvailability': {
+                                'quantity': qty
+                            }
+                        }
+                    }
+                )
+
         self._rate_limit('offer_update')
         resp = http_requests.put(
             f"{self.base_url}/sell/inventory/v1/offer/{offer_id}",

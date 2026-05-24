@@ -1,5 +1,5 @@
 {% extends "store/base.html" %}
-{% block title %}{{ product.title }} — RetroMonkey{% endblock %}
+{% block title %}{{ product.title }} — {{ config.STORE_NAME }}{% endblock %}
 
 {% block head %}
 <script type="application/ld+json">
@@ -9,7 +9,7 @@
     "name": "{{ product.title }}",
     "description": "{{ product.tagline or product.description or '' }}",
     {% if product.main_image %}"image": "{{ product.main_image }}",{% endif %}
-    "brand": { "@type": "Brand", "name": "RetroMonkey" },
+    "brand": { "@type": "Brand", "name": "{{ config.STORE_NAME }}" },
     "offers": {
         "@type": "Offer",
         "url": "{{ config.SITE_URL }}/product/{{ product.slug }}",

@@ -10,9 +10,14 @@ class Config:
     STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
     STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 
-    # Store
+    # Store Identity
     SITE_URL = os.environ.get('SITE_URL', 'http://localhost:5000')
     STORE_NAME = os.environ.get('STORE_NAME', 'RetroMonkey')
+    STORE_TAGLINE = os.environ.get('STORE_TAGLINE', 'Retro Gaming & Tech')
+    STORE_LOGO = os.environ.get('STORE_LOGO', '/static/images/logo.png')
+    STORE_THEME = os.environ.get('STORE_THEME', 'neon_noir')
+    STORE_CURRENCY = os.environ.get('STORE_CURRENCY', 'AUD')
+    STORE_AGENT_TOKEN = os.environ.get('STORE_AGENT_TOKEN', '')  # auth token for agent MCP access
     CURRENCY = 'aud'
     ABN = os.environ.get('ABN', '')
     BUSINESS_NAME = os.environ.get('BUSINESS_NAME', 'RetroMonkey')
@@ -58,6 +63,14 @@ class Config:
     GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
     GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
     GMAIL_REDIRECT_URI = os.environ.get('GMAIL_REDIRECT_URI', 'http://localhost:5000/api/intelligence/gmail/callback')
+    GOOGLE_PUBSUB_TOPIC = os.environ.get('GOOGLE_PUBSUB_TOPIC', '')
+    GOOGLE_GMAIL_WATCH_ENABLED = os.environ.get('GOOGLE_GMAIL_WATCH_ENABLED', 'false').lower() == 'true'
+
+    # Telegram Alerts
+    TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+    TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', '')
+    ALERT_EMAIL = os.environ.get('ALERT_EMAIL', 'aaronjking86@gmail.com')
+    ALERT_TELEGRAM_ENABLED = os.environ.get('ALERT_TELEGRAM_ENABLED', 'false').lower() == 'true'
 
     # Scheduler
     SCHEDULER_ORDER_POLL_INTERVAL = 15

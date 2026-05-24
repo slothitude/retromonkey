@@ -220,6 +220,36 @@ def gmail_send():
         return jsonify({"error": str(e)}), 400
 
 
+@intelligence_bp.route("/gmail/watch", methods=["POST"])
+def gmail_watch_start():
+    """POST /api/intelligence/gmail/watch — Start Gmail push notifications via Pub/Sub."""
+    topic = current_app.config.get("GOOGLE_PUBSUB_TOPIC", "")
+    if not topic:
+        return jsonify({"error": "GOOGLE_PUBSUB_TOPIC not configured"}), 400
+
+    from retromonkey.services.gmail_client import GmailClient
+    gmail = GmailClient(db)
+
+    try:
+        result = gmail.watch(topic)
+        return jsonify({"status": "watching", "result": result})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@intelligence_bp.route("/gmail/watch/stop", methods=["POST"])
+def gmail_watch_stop():
+    """POST /api/intelligence/gmail/watch/stop — Stop Gmail push notifications."""
+    from retromonkey.services.gmail_client import GmailClient
+    gmail = GmailClient(db)
+
+    try:
+        result = gmail.stop_watch()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
 # =====================================================================
 # Communications
 # =====================================================================
@@ -437,3 +467,103 @@ def request_review():
         return jsonify(result)
     except ValueError as e:
         return jsonify({"error": str(e)}), 404
+
+
+# =====================================================================
+# Alerts
+# =====================================================================
+
+@intelligence_bp.route("/alerts/test", methods=["POST"])
+def alert_test():
+    """POST /api/intelligence/alerts/test — Send test alert to all configured channels."""
+    from retromonkey.services.alert_service import AlertService
+    svc = AlertService(db)
+    result = svc.send_test_alert()
+    return jsonify(result)
+
+
+@intelligence_bp.route("/alerts/order", methods=["POST"])
+def alert_order():
+    """POST /api/intelligence/alerts/order — Send new order alert.
+
+    Body: {"order_id": "...", "buyer": "...", "total": "99.00", "items": [...], "source": "ebay"}
+    """
+    data = request.json or {}
+    from retromonkey.services.alert_service import AlertService
+    svc = AlertService(db)
+    result = svc.alert_new_order(data)
+    return jsonify(result)
+
+
+@intelligence_bp.route("/alerts/low-stock", methods=["POST"])
+def alert_low_stock():
+    """POST /api/intelligence/alerts/low-stock — Send low stock alert.
+
+    Body: {"sku": "...", "title": "...", "quantity": 2, "reorder_threshold": 5}
+    """
+    data = request.json or {}
+    from retromonkey.services.alert_service import AlertService
+    svc = AlertService(db)
+    result = svc.alert_low_stock(data)
+    return jsonify(result)
+
+
+@intelligence_bp.route("/alerts/daily-summary", methods=["POST"])
+def alert_daily_summary():
+    """POST /api/intelligence/alerts/daily-summary — Send enhanced daily summary alert."""
+    from retromonkey.services.alert_service import AlertService
+    from retromonkey.services.task_manager import TaskManager
+    tm = TaskManager(db)
+    summary = tm.get_daily_summary()
+    svc = AlertService(db)
+    result = svc.alert_daily_summary(summary)
+    # Strip non-serializable Task objects before jsonify
+    safe_summary = {k: v for k, v in summary.items() if k != "tasks"}
+    return jsonify({"summary": safe_summary, "alert": result})
+
+
+@intelligence_bp.route("/reports/morning-briefing", methods=["POST"])
+def report_morning_briefing():
+    """POST /api/intelligence/reports/morning-briefing — Send morning briefing now."""
+    from retromonkey.services.alert_service import AlertService
+    svc = AlertService(db)
+    result = svc.alert_morning_briefing()
+    return jsonify({"report": "morning_briefing", "alert": result})
+
+
+@intelligence_bp.route("/reports/weekly", methods=["POST"])
+def report_weekly():
+    """POST /api/intelligence/reports/weekly — Send weekly report now."""
+    from retromonkey.services.alert_service import AlertService
+    svc = AlertService(db)
+    result = svc.alert_weekly_report()
+    return jsonify({"report": "weekly", "alert": result})
+
+
+@intelligence_bp.route("/alerts/telegram/setup-webhook", methods=["POST"])
+def alert_telegram_setup_webhook():
+    """POST /api/intelligence/alerts/telegram/setup-webhook — Register Telegram webhook."""
+    from retromonkey.services.telegram_client import TelegramClient
+    tg = TelegramClient()
+    site_url = current_app.config.get("SITE_URL", "https://retromonkey.com.au")
+    webhook_url = f"{site_url.rstrip('/')}/webhooks/telegram"
+    result = tg.set_webhook(webhook_url)
+    return jsonify({"webhook_url": webhook_url, "result": result})
+
+
+@intelligence_bp.route("/alerts/config")
+def alert_config():
+    """GET /api/intelligence/alerts/config — Show alert channel configuration."""
+    from retromonkey.services.telegram_client import TelegramClient
+    tg = TelegramClient()
+    return jsonify({
+        "email": {
+            "address": current_app.config.get("ALERT_EMAIL", ""),
+            "configured": bool(current_app.config.get("SMTP_USER") or current_app.config.get("GOOGLE_CLIENT_ID")),
+        },
+        "telegram": {
+            "enabled": current_app.config.get("ALERT_TELEGRAM_ENABLED", False),
+            "bot_configured": bool(current_app.config.get("TELEGRAM_BOT_TOKEN")),
+            "chat_id_set": bool(current_app.config.get("TELEGRAM_CHAT_ID")),
+        },
+    })

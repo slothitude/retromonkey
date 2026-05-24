@@ -29,6 +29,8 @@ class WorkflowEngine:
             "update_order_status": self._action_update_order_status,
             "adjust_price": self._action_adjust_price,
             "log_event": self._action_log_event,
+            "telegram_notify": self._action_telegram_notify,
+            "email_alert": self._action_email_alert,
         }
         if workflows_dir:
             self.load_workflows(workflows_dir)
@@ -321,6 +323,45 @@ class WorkflowEngine:
         self.db.session.add(msg)
         self.db.session.commit()
         return {"logged": True, "message_id": msg.id}
+
+    def _action_telegram_notify(self, action: dict, context: dict) -> dict:
+        """Send a Telegram notification with optional inline buttons."""
+        from retromonkey.services.telegram_client import TelegramClient
+
+        message = self._resolve_template(action.get("message", ""), context)
+        parse_mode = action.get("parse_mode", "HTML")
+        buttons = action.get("buttons", [])
+
+        tg = TelegramClient()
+        if not tg.is_configured:
+            return {"sent": False, "reason": "Telegram not configured"}
+
+        reply_markup = None
+        if buttons:
+            resolved_buttons = []
+            for row in buttons:
+                resolved_row = []
+                for btn in row:
+                    resolved_row.append({
+                        "text": self._resolve_template(btn.get("text", ""), context),
+                        "callback_data": self._resolve_template(btn.get("callback_data", ""), context),
+                    })
+                resolved_buttons.append(resolved_row)
+            reply_markup = {"inline_keyboard": resolved_buttons}
+
+        resp = tg.send_message(message, parse_mode=parse_mode, reply_markup=reply_markup)
+        return {"sent": resp.get("ok", False), "response": resp}
+
+    def _action_email_alert(self, action: dict, context: dict) -> dict:
+        """Send an alert email via the AlertService."""
+        from retromonkey.services.alert_service import AlertService
+
+        subject = self._resolve_template(action.get("subject", ""), context)
+        body = self._resolve_template(action.get("body", ""), context)
+
+        svc = AlertService(self.db)
+        result = svc.send_alert(subject=subject, plain_text=body)
+        return {"email": result.get("email"), "telegram": result.get("telegram")}
 
     # ------------------------------------------------------------------
     # Template helpers

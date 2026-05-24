@@ -1,5 +1,6 @@
+# RetroMonkey — primary store
 retromonkey.com.au {
-    reverse_proxy localhost:5000
+    reverse_proxy retromonkey:5000
 
     encode gzip
 
@@ -18,3 +19,20 @@ retromonkey.com.au {
 www.retromonkey.com.au {
     redir https://retromonkey.com.au{uri} permanent
 }
+
+# Future stores — uncomment and configure when adding a new store:
+# techtreasure.com.au {
+#     reverse_proxy techtreasure:5000
+#     encode gzip
+#     @static path /static/*
+#     header @static Cache-Control "public, max-age=31536000, immutable"
+#     header {
+#         X-Frame-Options DENY
+#         X-Content-Type-Options nosniff
+#         Referrer-Policy strict-origin-when-cross-origin
+#     }
+# }
+#
+# www.techtreasure.com.au {
+#     redir https://techtreasure.com.au{uri} permanent
+# }

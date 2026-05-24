@@ -1,0 +1,26 @@
+name: new_order_alert
+description: Send email and Telegram alerts when a new order is received
+trigger:
+  event: order_received
+actions:
+  - type: telegram_notify
+    message: >
+      <b>New Order #{{order_id}}</b>
+      Source: {{source}}
+      Buyer: {{buyer}}
+      Total: <b>${{total}} AUD</b>
+    buttons:
+      - - text: "View Order"
+          callback_data: "view_order:{{order_id}}"
+        - text: "Mark Processing"
+          callback_data: "mark_processing:{{order_id}}"
+  - type: email_alert
+    subject: "[RetroMonkey] New Order #{{order_id}}"
+    body: >
+      New order received:
+
+      Order ID: {{order_id}}
+      Source: {{source}}
+      Buyer: {{buyer}}
+      Total: ${{total}} AUD
+      Items: {{items}}

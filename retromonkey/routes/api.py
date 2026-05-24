@@ -1,4 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app
+from functools import wraps
+from datetime import datetime, timedelta
 from retromonkey.app import db
 from retromonkey.models.product import Product
 from retromonkey.models.order import Order, OrderItem, Shipment
@@ -9,11 +11,48 @@ api_bp = Blueprint('api', __name__)
 inv_svc = InventoryService(db)
 
 
+def agent_auth_required(f):
+    """Require STORE_AGENT_TOKEN for agent access. Skipped if token not configured."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = current_app.config.get('STORE_AGENT_TOKEN', '')
+        if not token:
+            return f(*args, **kwargs)  # No token configured, open access
+        auth = request.headers.get('Authorization', '')
+        if auth == f'Bearer {token}':
+            return f(*args, **kwargs)
+        return jsonify({'error': 'Unauthorized'}), 401
+    return decorated
+
+
 # --- Health ---
 @api_bp.route('/health')
 def health():
     llm_status = {'claude': bool(current_app.config.get('CLAUDE_API_KEY')), 'ollama': True}
     return jsonify({'status': 'ok', 'llm': llm_status, 'db': 'ok', 'scheduler': 'running'})
+
+
+# --- Agent Health (for store agent monitoring) ---
+@api_bp.route('/health/detailed')
+@agent_auth_required
+def health_detailed():
+    """Detailed health endpoint for the store agent."""
+    product_count = db.session.query(Product).count()
+    since = datetime.utcnow() - timedelta(hours=24)
+    orders_24h = db.session.query(Order).filter(Order.ordered_at >= since).count()
+    low_stock = len(inv_svc.get_low_stock_products()) if hasattr(inv_svc, 'get_low_stock_products') else 0
+    marketplaces = {}
+    for mp in db.session.query(Marketplace).all():
+        marketplaces[mp.name.lower()] = 'active' if mp.active else 'inactive'
+    return jsonify({
+        'store': current_app.config.get('STORE_NAME', 'RetroMonkey'),
+        'status': 'healthy',
+        'products': product_count,
+        'orders_24h': orders_24h,
+        'low_stock': low_stock,
+        'marketplaces': marketplaces,
+        'timestamp': datetime.utcnow().isoformat(),
+    })
 
 
 # --- Products ---

@@ -1,5 +1,5 @@
 {% extends "store/base.html" %}
-{% block title %}Terms of Service — RetroMonkey{% endblock %}
+{% block title %}Terms of Service — {{ config.STORE_NAME }}{% endblock %}
 
 {% block content %}
 <div class="legal-page">
@@ -8,7 +8,7 @@
 
     <section>
         <h2>1. Agreement to Terms</h2>
-        <p>By accessing and using the RetroMonkey website and purchasing our products, you agree to be bound by these Terms of Service. If you do not agree, please do not use our services.</p>
+        <p>By accessing and using the {{ config.STORE_NAME }} website and purchasing our products, you agree to be bound by these Terms of Service. If you do not agree, please do not use our services.</p>
     </section>
 
     <section>
@@ -57,12 +57,12 @@
 
     <section>
         <h2>7. Product Disclaimer</h2>
-        <p>Our retro gaming handhelds come pre-loaded with games. Users are responsible for ensuring they have the right to use any software pre-installed on the devices. RetroMonkey does not hold licences for the games pre-loaded on these devices and sells the hardware only.</p>
+        <p>Our retro gaming handhelds come pre-loaded with games. Users are responsible for ensuring they have the right to use any software pre-installed on the devices. {{ config.STORE_NAME }} does not hold licences for the games pre-loaded on these devices and sells the hardware only.</p>
     </section>
 
     <section>
         <h2>8. Limitation of Liability</h2>
-        <p>To the maximum extent permitted by law, RetroMonkey's liability for any claim arising from the use of our website or products is limited to the amount you paid for the product. Nothing in these terms excludes or limits rights under the Australian Consumer Law.</p>
+        <p>To the maximum extent permitted by law, {{ config.STORE_NAME }}'s liability for any claim arising from the use of our website or products is limited to the amount you paid for the product. Nothing in these terms excludes or limits rights under the Australian Consumer Law.</p>
     </section>
 
     <section>

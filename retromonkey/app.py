@@ -57,6 +57,8 @@ def create_app(config_name='dev'):
     if not os.environ.get('MCP_MODE'):
         _setup_scheduler(app)
         scheduler.start()
+        _register_telegram_webhook(app)
+        _register_gmail_watch(app)
 
     return app
 
@@ -77,12 +79,19 @@ def _setup_scheduler(app):
         with app.app_context():
             from .models import Marketplace
             from .connectors.ebay import EbayConnector
+            from .services.alert_service import AlertService
+            alert_svc = AlertService(db)
             for mp in Marketplace.query.filter_by(active=True).all():
                 if mp.name == 'eBay':
                     try:
                         conn = EbayConnector(mp, app.config)
                         if conn.is_authenticated():
-                            conn.get_orders()
+                            orders = conn.get_orders()
+                            # Alert for new orders
+                            if isinstance(orders, list):
+                                for order in orders:
+                                    if isinstance(order, dict):
+                                        alert_svc.alert_new_order(order)
                     except Exception:
                         pass
 
@@ -101,8 +110,13 @@ def _setup_scheduler(app):
         with app.app_context():
             try:
                 from .services.inventory import InventoryService
+                from .services.alert_service import AlertService
                 inv = InventoryService(db)
-                inv.check_reorder_needed()
+                low = inv.check_reorder_needed()
+                alert_svc = AlertService(db)
+                for item in low if isinstance(low, list) else []:
+                    if isinstance(item, dict):
+                        alert_svc.alert_low_stock(item)
             except Exception:
                 pass
 
@@ -115,14 +129,25 @@ def _setup_scheduler(app):
                 tm.generate_daily_checklist()
             except Exception:
                 pass
+            # Send morning briefing after checklist is generated
+            try:
+                from .services.alert_service import AlertService
+                alert_svc = AlertService(db)
+                alert_svc.alert_morning_briefing()
+            except Exception:
+                pass
 
     @scheduler.task('cron', id='daily_summary', hour=18)
     def daily_summary():
         with app.app_context():
             try:
                 from .services.task_manager import TaskManager
+                from .services.alert_service import AlertService
                 tm = TaskManager(db)
                 summary = tm.get_daily_summary()
+                # Send alert with daily summary
+                alert_svc = AlertService(db)
+                alert_svc.alert_daily_summary(summary)
                 # Mark any remaining EOD summary task as in_progress
                 from .models.task import Task
                 eod = db.session.query(Task).filter(
@@ -138,6 +163,31 @@ def _setup_scheduler(app):
                     db.session.commit()
             except Exception:
                 pass
+
+    @scheduler.task('cron', id='weekly_report', day_of_week='mon', hour=9)
+    def weekly_report():
+        with app.app_context():
+            try:
+                from .services.alert_service import AlertService
+                alert_svc = AlertService(db)
+                alert_svc.alert_weekly_report()
+            except Exception:
+                pass
+
+    @scheduler.task('cron', id='gmail_watch_renewal', hour=3)
+    def gmail_watch_renewal():
+        """Renew Gmail Pub/Sub watch daily (watches expire after ~7 days)."""
+        with app.app_context():
+            topic = app.config.get('GOOGLE_PUBSUB_TOPIC', '')
+            if not topic:
+                return
+            try:
+                from .services.gmail_client import GmailClient
+                gmail = GmailClient(db)
+                result = gmail.watch(topic)
+                app.logger.info("Gmail watch renewed: %s", result.get('historyId'))
+            except Exception as exc:
+                app.logger.warning("Gmail watch renewal failed: %s", exc)
 
 
 def _connector_factory(marketplace_record):
@@ -155,3 +205,41 @@ def _connector_factory(marketplace_record):
     if cls:
         return cls(marketplace_record, current_app.config)
     raise ValueError(f"Unknown marketplace: {marketplace_record.name}")
+
+
+def _register_telegram_webhook(app):
+    """Register Telegram webhook on startup if configured."""
+    if not app.config.get('ALERT_TELEGRAM_ENABLED'):
+        return
+    with app.app_context():
+        try:
+            from .services.telegram_client import TelegramClient
+            tg = TelegramClient()
+            if tg.is_configured:
+                site_url = app.config.get('SITE_URL', 'https://retromonkey.com.au')
+                webhook_url = f"{site_url.rstrip('/')}/webhooks/telegram"
+                result = tg.set_webhook(webhook_url)
+                if result.get('ok'):
+                    app.logger.info("Telegram webhook registered: %s", webhook_url)
+                else:
+                    app.logger.warning("Telegram webhook failed: %s", result.get('description'))
+        except Exception as exc:
+            app.logger.warning("Telegram webhook registration failed: %s", exc)
+
+
+def _register_gmail_watch(app):
+    """Register Gmail Pub/Sub watch on startup if configured."""
+    if not app.config.get('GOOGLE_GMAIL_WATCH_ENABLED'):
+        return
+    topic = app.config.get('GOOGLE_PUBSUB_TOPIC', '')
+    if not topic:
+        app.logger.warning("Gmail watch enabled but GOOGLE_PUBSUB_TOPIC not set")
+        return
+    with app.app_context():
+        try:
+            from .services.gmail_client import GmailClient
+            gmail = GmailClient(db)
+            result = gmail.watch(topic)
+            app.logger.info("Gmail watch registered: historyId=%s", result.get('historyId'))
+        except Exception as exc:
+            app.logger.warning("Gmail watch registration failed: %s", exc)

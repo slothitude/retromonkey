@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Order {{ order.external_order_id or order.id }} - RetroMonkey{% endblock %}
+{% block title %}Order {{ order.external_order_id or order.id }} - {{ config.STORE_NAME }}{% endblock %}
 
 {% block content %}
 <div class="page-header">

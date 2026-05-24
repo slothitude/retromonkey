@@ -1,12 +1,12 @@
 {% extends "store/base.html" %}
-{% block title %}RetroMonkey — Retro Gaming Handhelds{% endblock %}
+{% block title %}{{ config.STORE_NAME }} — {{ config.STORE_TAGLINE }}{% endblock %}
 
 {% block head %}
 <script type="application/ld+json">
 {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    "name": "RetroMonkey",
+    "name": "{{ config.STORE_NAME }}",
     "url": "{{ config.SITE_URL }}",
     "potentialAction": {
         "@type": "SearchAction",

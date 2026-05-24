@@ -25,6 +25,7 @@ class InventorySyncService:
                 pulled = len(remote_inventory)
 
                 discrepancies = 0
+                pushed = 0
                 for item in remote_inventory:
                     local = self.db.session.query(Product).filter_by(sku=item['sku']).first()
                     if local and local.inventory:
@@ -35,8 +36,19 @@ class InventorySyncService:
                                 f"Inventory discrepancy: {item['sku']} on {mp.name} "
                                 f"remote={item['quantity']} local={available}"
                             )
+                            # Push local quantity to eBay
+                            listing = self.db.session.query(Listing).filter_by(
+                                product_id=local.id, marketplace_id=mp.id, status='active'
+                            ).first()
+                            if listing:
+                                try:
+                                    connector.update_listing(listing, {'availableQuantity': available})
+                                    pushed += 1
+                                    logger.info(f"Pushed {available} units for {item['sku']} to {mp.name}")
+                                except Exception as e:
+                                    logger.error(f"Failed to push quantity for {item['sku']}: {e}")
 
-                results[mp.name] = {'pulled': pulled, 'discrepancies': discrepancies}
+                results[mp.name] = {'pulled': pulled, 'discrepancies': discrepancies, 'pushed': pushed}
 
             except Exception as e:
                 results[mp.name] = {'error': str(e)}

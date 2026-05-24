@@ -1,5 +1,5 @@
 {% extends "store/base.html" %}
-{% block title %}Privacy Policy — RetroMonkey{% endblock %}
+{% block title %}Privacy Policy — {{ config.STORE_NAME }}{% endblock %}
 
 {% block content %}
 <div class="legal-page">
@@ -8,7 +8,7 @@
 
     <section>
         <h2>1. Introduction</h2>
-        <p>RetroMonkey ("we", "us", or "our") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit our website or make a purchase. This policy is governed by the <em>Privacy Act 1988</em> (Cth) and the Australian Privacy Principles (APPs).</p>
+        <p>{{ config.STORE_NAME }} ("we", "us", or "our") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit our website or make a purchase. This policy is governed by the <em>Privacy Act 1988</em> (Cth) and the Australian Privacy Principles (APPs).</p>
     </section>
 
     <section>

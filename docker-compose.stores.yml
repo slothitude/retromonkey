@@ -1,0 +1,46 @@
+# Multi-store deployment — each store runs in its own container
+# Usage: docker compose -f docker-compose.stores.yml up -d
+#
+# Add stores by:
+# 1. Create ./stores/<name>/ directory with .env and images/
+# 2. Add a service block below following the retromonkey pattern
+# 3. Add a Caddy site block for the domain
+# 4. Run: ./scripts/add-store.sh <name>
+
+services:
+  retromonkey:
+    build: .
+    container_name: retromonkey
+    restart: unless-stopped
+    env_file: ./stores/retromonkey.env
+    environment:
+      - FLASK_ENV=production
+      - DATABASE_URL=sqlite:///retromonkey.db
+    volumes:
+      - ./stores/retromonkey/db:/app/instance
+      - ./stores/retromonkey/images:/app/retromonkey/static/images
+    ports:
+      - "5001:5000"
+    networks:
+      - store-net
+
+  # Example: second store
+  # techtreasure:
+  #   build: .
+  #   container_name: techtreasure
+  #   restart: unless-stopped
+  #   env_file: ./stores/techtreasure.env
+  #   environment:
+  #     - FLASK_ENV=production
+  #     - DATABASE_URL=sqlite:///retromonkey.db
+  #   volumes:
+  #     - ./stores/techtreasure/db:/app/instance
+  #     - ./stores/techtreasure/images:/app/retromonkey/static/images
+  #   ports:
+  #     - "5002:5000"
+  #   networks:
+  #     - store-net
+
+networks:
+  store-net:
+    driver: bridge
