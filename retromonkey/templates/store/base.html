@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/static/images/favicon.png">
     <title>{% block title %}RetroMonkey{% endblock %}</title>
     <meta name="description" content="{% block meta_description %}RetroMonkey — Australia's retro gaming handheld store. Free shipping over $50. Secure checkout.{% endblock %}">
     <link rel="canonical" href="{{ config.SITE_URL }}{{ request.path }}">
@@ -39,8 +40,7 @@
     <header>
         <div class="header-inner">
             <a href="/" class="logo">
-                <span class="logo-icon">&#128053;</span>
-                <span class="logo-text">Retro<span class="accent">Monkey</span></span>
+                <img src="/static/images/logo.png" alt="RetroMonkey" class="logo-img">
             </a>
             <nav>
                 <form class="nav-search" action="/search" method="GET">

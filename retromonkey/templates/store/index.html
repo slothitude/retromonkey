@@ -50,17 +50,9 @@
 {% endmacro %}
 
 {% block content %}
-<section class="hero" style="position:relative;overflow:hidden;background:#050508">
-    <img src="/static/images/hero-banner.webp" alt="RetroMonkey" style="width:100%;height:auto;display:block;opacity:0.5">
-    <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 50%,#050508 100%);pointer-events:none"></div>
-    {% if featured %}
-    <div class="product-grid" style="position:absolute;bottom:8%;left:50%;transform:translateX(-50%);z-index:1;max-width:1200px;width:calc(100% - 3rem)">
-        {% for p in featured %}
-        {{ product_card(p, loop) }}
-        {% endfor %}
-    </div>
-    {% endif %}
-</section>
+<div style="position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden">
+    <img src="/static/images/hero-banner.webp" alt="" style="width:100%;height:100%;object-fit:cover;opacity:0.2">
+</div>
 
 <section id="products" class="all-products">
     <h2 class="section-title reveal">All Products</h2>

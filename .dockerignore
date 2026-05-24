@@ -1,0 +1,39 @@
+# Database — mounted as volume, never bake into image
+*.db
+*.db.bak
+instance/
+
+# Secrets — mounted as volume
+.env
+.env.*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.claude/
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Plans (local only)
+plans/
+
+# Deployment scripts (not needed in container)
+deploy.sh
+sync_data.sh
+
+# Data directory (backups, envs)
+data/

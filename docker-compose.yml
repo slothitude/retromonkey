@@ -10,5 +10,6 @@ services:
       - FLASK_ENV=production
       - DATABASE_URL=sqlite:///retromonkey.db
     volumes:
-      - ./retromonkey.db:/app/retromonkey.db
+      - ./instance/retromonkey.db:/app/instance/retromonkey.db
       - ./retromonkey/static/images:/app/retromonkey/static/images
+      - ./instance/gmail_tokens.json:/app/instance/gmail_tokens.json
