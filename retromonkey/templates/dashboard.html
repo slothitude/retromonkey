@@ -39,6 +39,50 @@
 
 <!-- Dashboard Grid -->
 <div class="dashboard-grid">
+    <!-- Today's Tasks Widget -->
+    <div class="card">
+        <div class="card-header">
+            <h3>Today's Tasks</h3>
+            <span class="badge-status badge-{% if todays_tasks_completed == todays_tasks_total %}active{% elif todays_tasks_completed > 0 %}pending{% else %}pending{% endif %}">
+                {{ todays_tasks_completed }}/{{ todays_tasks_total }}
+            </span>
+        </div>
+        <div class="card-body">
+            <div style="margin-bottom: 12px;">
+                <div style="background: var(--bg-secondary); border-radius: 4px; height: 6px; overflow: hidden;">
+                    <div style="background: var(--accent); height: 100%; width: {{ todays_pct }}%; transition: width 0.3s;"></div>
+                </div>
+                <small class="text-muted">{{ todays_pct }}% complete</small>
+            </div>
+            <table class="data-table" style="font-size: 0.9em;">
+                <tbody>
+                    {% for task in todays_tasks %}
+                    <tr>
+                        <td style="width: 30px;">
+                            {% if task.status == 'completed' %}
+                            <span style="color: var(--accent);">&#10003;</span>
+                            {% else %}
+                            <span style="color: var(--text-muted);">&#9675;</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span {% if task.status == 'completed' %}style="text-decoration: line-through; opacity: 0.6;"{% endif %}>
+                                {{ task.title }}
+                            </span>
+                        </td>
+                        <td><span class="badge-status badge-{{ task.status }}">{{ task.status }}</span></td>
+                        <td><small class="text-muted">{{ task.category }}</small></td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center text-muted">No tasks for today</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <div class="card">
         <div class="card-header">
             <h3>Revenue (Last 30 Days)</h3>

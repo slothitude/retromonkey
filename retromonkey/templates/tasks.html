@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}Tasks - RetroMonkey{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Daily Management</h1>
+    <span class="text-muted">{{ summary.date }}</span>
+</div>
+
+<!-- Summary KPIs -->
+<div class="kpi-row">
+    <div class="kpi-card">
+        <span class="kpi-label">Completed</span>
+        <span class="kpi-value" style="color: var(--accent);">{{ summary.completed }}</span>
+    </div>
+    <div class="kpi-card">
+        <span class="kpi-label">Pending</span>
+        <span class="kpi-value">{{ summary.pending }}</span>
+    </div>
+    <div class="kpi-card">
+        <span class="kpi-label">In Progress</span>
+        <span class="kpi-value">{{ summary.in_progress }}</span>
+    </div>
+    <div class="kpi-card">
+        <span class="kpi-label">Overdue</span>
+        <span class="kpi-value {{ 'text-danger' if summary.overdue > 0 }}">{{ summary.overdue }}</span>
+    </div>
+    <div class="kpi-card">
+        <span class="kpi-label">Progress</span>
+        <span class="kpi-value">{{ summary.completion_pct }}%</span>
+    </div>
+</div>
+
+<!-- Progress Bar -->
+<div style="margin-bottom: 24px;">
+    <div style="background: var(--bg-secondary); border-radius: 6px; height: 10px; overflow: hidden;">
+        <div style="background: var(--accent); height: 100%; width: {{ summary.completion_pct }}%; transition: width 0.5s;"></div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card">
+    <div class="card-header">
+        <h3>Tasks</h3>
+        <div style="display: flex; gap: 8px;">
+            <select onchange="location.href='/admin/tasks?status='+this.value+'&category={{ category_filter }}'" class="form-control" style="width: auto;">
+                <option value="">All Statuses</option>
+                <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+                <option value="in_progress" {% if status_filter == 'in_progress' %}selected{% endif %}>In Progress</option>
+                <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Completed</option>
+                <option value="skipped" {% if status_filter == 'skipped' %}selected{% endif %}>Skipped</option>
+            </select>
+            <select onchange="location.href='/admin/tasks?category='+this.value+'&status={{ status_filter }}'" class="form-control" style="width: auto;">
+                <option value="">All Categories</option>
+                {% for cat in categories %}
+                <option value="{{ cat }}" {% if category_filter == cat %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    <div class="card-body">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 40px;"></th>
+                    <th>Task</th>
+                    <th>Category</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Due</th>
+                    <th>Result</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for task in tasks %}
+                <tr>
+                    <td>
+                        {% if task.status == 'completed' %}
+                        <span style="color: var(--accent); font-size: 1.2em;">&#10003;</span>
+                        {% elif task.status == 'skipped' %}
+                        <span style="color: var(--text-muted);">&#8212;</span>
+                        {% else %}
+                        <span style="color: var(--text-muted); font-size: 1.2em;">&#9675;</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <strong {% if task.status == 'completed' %}style="text-decoration: line-through; opacity: 0.6;"{% endif %}>{{ task.title }}</strong>
+                        {% if task.description %}<br><small class="text-muted">{{ task.description }}</small>{% endif %}
+                    </td>
+                    <td><small>{{ task.category }}</small></td>
+                    <td>
+                        <span class="badge-status badge-{{ 'active' if task.priority == 'high' or task.priority == 'critical' else task.priority }}">
+                            {{ task.priority }}
+                        </span>
+                    </td>
+                    <td><span class="badge-status badge-{{ task.status }}">{{ task.status }}</span></td>
+                    <td><small>{{ task.due_at.strftime('%H:%M') if task.due_at else '-' }}</small></td>
+                    <td><small class="text-muted">{{ (task.result_notes or '')[:50] }}</small></td>
+                    <td class="actions-col">
+                        {% if task.status != 'completed' %}
+                        <button class="btn btn-primary btn-sm" onclick="completeTask({{ task.id }})">Done</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="text-center text-muted">No tasks found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Overdue Section -->
+{% if overdue %}
+<div class="card" style="margin-top: 16px; border-left: 3px solid var(--danger, #e74c3c);">
+    <div class="card-header">
+        <h3>Overdue</h3>
+    </div>
+    <div class="card-body">
+        {% for task in overdue %}
+        <div style="padding: 8px 0; border-bottom: 1px solid var(--bg-secondary);">
+            <strong>{{ task.title }}</strong> <small class="text-muted">due {{ task.due_at.strftime('%b %d, %H:%M') if task.due_at else '-' }}</small>
+            <button class="btn btn-primary btn-sm" style="float: right;" onclick="completeTask({{ task.id }})">Done</button>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function completeTask(taskId) {
+    const notes = prompt('Result notes (optional):');
+    fetch('/api/tasks/' + taskId + '/complete', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({notes: notes || ''})
+    }).then(r => {
+        if (r.ok) location.reload();
+        else alert('Failed to complete task');
+    });
+}
+</script>
+{% endblock %}

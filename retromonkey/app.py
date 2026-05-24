@@ -45,6 +45,9 @@ def create_app(config_name='dev'):
     from .routes.intelligence import intelligence_bp
     app.register_blueprint(intelligence_bp, url_prefix='/api/intelligence')
 
+    from .routes.tasks import tasks_bp
+    app.register_blueprint(tasks_bp, url_prefix='/api/tasks')
+
     with app.app_context():
         from . import models  # noqa: F401
         db.create_all()
@@ -100,6 +103,39 @@ def _setup_scheduler(app):
                 from .services.inventory import InventoryService
                 inv = InventoryService(db)
                 inv.check_reorder_needed()
+            except Exception:
+                pass
+
+    @scheduler.task('cron', id='daily_checklist', hour=8, minute=30)
+    def daily_checklist():
+        with app.app_context():
+            try:
+                from .services.task_manager import TaskManager
+                tm = TaskManager(db)
+                tm.generate_daily_checklist()
+            except Exception:
+                pass
+
+    @scheduler.task('cron', id='daily_summary', hour=18)
+    def daily_summary():
+        with app.app_context():
+            try:
+                from .services.task_manager import TaskManager
+                tm = TaskManager(db)
+                summary = tm.get_daily_summary()
+                # Mark any remaining EOD summary task as in_progress
+                from .models.task import Task
+                eod = db.session.query(Task).filter(
+                    Task.title == "End of Day Summary",
+                    Task.status == "pending",
+                ).first()
+                if eod:
+                    eod.status = "in_progress"
+                    eod.result_notes = (
+                        f"Auto-summary: {summary['completed']}/{summary['total']} tasks done "
+                        f"({summary['completion_pct']}%)"
+                    )
+                    db.session.commit()
             except Exception:
                 pass
 

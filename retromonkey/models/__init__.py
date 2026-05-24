@@ -7,3 +7,4 @@ from .supplier import Supplier, PurchaseOrder, RFQ, SupplierScore
 from .communication import Message
 from .customer import Customer
 from .stripe_event import StripeEvent
+from .task import Task

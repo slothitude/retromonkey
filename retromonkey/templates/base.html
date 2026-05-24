@@ -43,6 +43,10 @@
                 <span class="nav-icon">&#9993;</span>
                 <span class="nav-text">Inbox</span>
             </a>
+            <a href="/admin/tasks" class="nav-item {% if page == 'tasks' %}active{% endif %}">
+                <span class="nav-icon">&#9745;</span>
+                <span class="nav-text">Tasks</span>
+            </a>
             <a href="{{ url_for('pages.settings') }}" class="nav-item {% if page == 'settings' %}active{% endif %}">
                 <span class="nav-icon">&#9881;</span>
                 <span class="nav-text">Settings</span>

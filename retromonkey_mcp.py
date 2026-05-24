@@ -15,6 +15,7 @@ from retromonkey.app import create_app, db
 from retromonkey.models import (
     Product, Inventory, Marketplace, Listing, Order, OrderItem, Shipment,
     Transaction, Fee, Supplier, PurchaseOrder, RFQ, SupplierScore, Message,
+    Task,
 )
 
 app = create_app()
@@ -133,6 +134,11 @@ def svc_accounting():
 def svc_support():
     from retromonkey.services.customer_service import CustomerServiceService
     return CustomerServiceService(db, svc_llm())
+
+
+def svc_task():
+    from retromonkey.services.task_manager import TaskManager
+    return TaskManager(db)
 
 
 # ---------------------------------------------------------------------------
@@ -552,6 +558,33 @@ TOOLS = [
          'message_id': {'type': 'string'},
          'label_name': {'type': 'string'}},
          'required': ['message_id', 'label_name']}},
+
+    # ---- Tasks ----
+    {'name': 'task_list', 'description': 'List tasks with filters (status, category, days)',
+     'inputSchema': {'type': 'object', 'properties': {
+         'status': {'type': 'string', 'description': 'Filter by status (pending, in_progress, completed, skipped)'},
+         'category': {'type': 'string', 'description': 'Filter by category'},
+         'days': {'type': 'integer', 'description': 'Only tasks from last N days'}}}},
+
+    {'name': 'task_create', 'description': 'Create an ad-hoc task',
+     'inputSchema': {'type': 'object', 'properties': {
+         'title': {'type': 'string'},
+         'description': {'type': 'string'},
+         'category': {'type': 'string', 'default': 'general'},
+         'priority': {'type': 'string', 'default': 'medium'}},
+         'required': ['title']}},
+
+    {'name': 'task_complete', 'description': 'Complete a task with result notes',
+     'inputSchema': {'type': 'object', 'properties': {
+         'task_id': {'type': 'integer'},
+         'notes': {'type': 'string', 'description': 'Result notes for the completed task'}},
+         'required': ['task_id']}},
+
+    {'name': 'task_daily', 'description': 'Get or generate today\'s daily management checklist',
+     'inputSchema': {'type': 'object', 'properties': {}}},
+
+    {'name': 'task_summary', 'description': 'Get daily summary (completed, pending, overdue counts)',
+     'inputSchema': {'type': 'object', 'properties': {}}},
 ]
 
 # ===========================================================================
@@ -750,6 +783,22 @@ HANDLERS = {
         reply_to_message_id=a.get('reply_to_message_id'))),
 
     'gmail_label': _ctx(lambda a: svc_gmail().apply_label(a['message_id'], a['label_name'])),
+
+    # ---- Tasks ----
+    'task_list': _ctx(lambda a: _task_list(a)),
+
+    'task_create': _ctx(lambda a: svc_task().create_task(
+        title=a['title'],
+        description=a.get('description'),
+        category=a.get('category', 'general'),
+        priority=a.get('priority', 'medium'))),
+
+    'task_complete': _ctx(lambda a: svc_task().complete_task(
+        a['task_id'], notes=a.get('notes'))),
+
+    'task_daily': _ctx(lambda a: svc_task().generate_daily_checklist()),
+
+    'task_summary': _ctx(lambda a: svc_task().get_daily_summary()),
 }
 
 
@@ -881,6 +930,31 @@ def _ebay_end_listing(args):
     if not listing:
         raise ValueError(f"Listing {args['listing_id']} not found")
     return conn.end_listing(listing)
+
+
+def _task_list(args):
+    tm = svc_task()
+    tasks = tm.get_tasks(
+        status=args.get('status'),
+        category=args.get('category'),
+        days=args.get('days'),
+    )
+    return {
+        'total': len(tasks),
+        'tasks': [
+            {
+                'id': t.id,
+                'title': t.title,
+                'category': t.category,
+                'priority': t.priority,
+                'status': t.status,
+                'due_at': str(t.due_at) if t.due_at else None,
+                'completed_at': str(t.completed_at) if t.completed_at else None,
+                'result_notes': t.result_notes,
+            }
+            for t in tasks
+        ],
+    }
 
 
 # ===========================================================================

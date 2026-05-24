@@ -20,6 +20,7 @@ from retromonkey.models import (
     RFQ,
     SupplierScore,
     Message,
+    Task,
 )
 
 pages_bp = Blueprint("pages", __name__)
@@ -106,12 +107,24 @@ def dashboard():
         "last_sync": "15 min ago",
     }
 
+    # Today's tasks for the dashboard widget
+    from retromonkey.services.task_manager import TaskManager
+    tm = TaskManager(db)
+    todays_tasks = tm.get_todays_tasks()
+    todays_completed = sum(1 for t in todays_tasks if t.status == "completed")
+    todays_total = len(todays_tasks)
+    todays_pct = round(todays_completed / todays_total * 100) if todays_total else 0
+
     return render_template(
         "dashboard.html",
         page="dashboard",
         stats=stats,
         recent_orders=recent_orders,
         chart_data=chart_data,
+        todays_tasks=todays_tasks,
+        todays_tasks_completed=todays_completed,
+        todays_tasks_total=todays_total,
+        todays_pct=todays_pct,
     )
 
 
@@ -486,4 +499,37 @@ def settings():
         ollama_model="qwen3",
         ebay_env="Sandbox",
         amazon_region="Australia",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tasks
+# ---------------------------------------------------------------------------
+@pages_bp.route("/tasks")
+def task_page():
+    status_filter = request.args.get("status", "")
+    category_filter = request.args.get("category", "")
+
+    from retromonkey.services.task_manager import TaskManager
+    tm = TaskManager(db)
+
+    if status_filter or category_filter:
+        tasks = tm.get_tasks(status=status_filter or None, category=category_filter or None)
+    else:
+        tasks = tm.get_todays_tasks()
+
+    summary = tm.get_daily_summary()
+    overdue = tm.get_overdue_tasks()
+
+    categories = list(set(t.category for t in tasks)) if tasks else []
+
+    return render_template(
+        "tasks.html",
+        page="tasks",
+        tasks=tasks,
+        summary=summary,
+        overdue=overdue,
+        categories=categories,
+        status_filter=status_filter,
+        category_filter=category_filter,
     )
