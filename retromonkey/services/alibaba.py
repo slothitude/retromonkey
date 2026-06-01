@@ -306,7 +306,7 @@ class AlibabaConnector:
             {
                 'id': p.get('productId', p.get('id', '')),
                 'title': p.get('subject', p.get('title', p.get('productName', ''))),
-                'price': float(p.get('price', p.get('unitPrice', p.get('priceRange', {}).get('min', 0)) or 0),
+                'price': float(p.get('price', p.get('unitPrice', p.get('priceRange', {}).get('min', 0))) or 0),
                 'min_order': int(p.get('moq', p.get('minOrderQuantity', 0))),
                 'image_url': p.get('imageUrl', p.get('mainImage', '')),
                 'product_url': p.get('productUrl', p.get('detailUrl', '')),
