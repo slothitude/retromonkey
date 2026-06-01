@@ -1,0 +1,36 @@
+name: dropship_fulfillment
+description: Handle new dropship orders — alert, create record, notify human to source
+trigger:
+  event: order_received
+actions:
+  - type: telegram_notify
+    message: >
+      <b>New Dropship Order #{{order_id}}</b>
+      Source: {{source}}
+      Buyer: {{buyer}}
+      Total: <b>${{total}} AUD</b>
+      <i>Action required: Source and fulfill on AliExpress</i>
+    buttons:
+      - - text: "View Order"
+          callback_data: "view_order:{{order_id}}"
+        - text: "Mark Processing"
+          callback_data: "mark_processing:{{order_id}}"
+  - type: log_event
+    channel: system
+    subject: "Dropship order received #{{order_id}}"
+    message: >
+      New dropship order {{order_id}} from {{source}}.
+      Buyer: {{buyer}}. Total: ${{total}} AUD.
+      Items: {{items}}
+  - type: email_alert
+    subject: "[RetroMonkey] Dropship Order #{{order_id}} — Action Required"
+    body: >
+      New order received that requires dropship fulfillment.
+
+      Order ID: {{order_id}}
+      Source: {{source}}
+      Buyer: {{buyer}}
+      Total: ${{total}} AUD
+      Items: {{items}}
+
+      Please source this order on AliExpress and record via the dropship MCP tools.

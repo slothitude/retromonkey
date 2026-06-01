@@ -16,7 +16,19 @@ def ebay_webhook():
 
     if event_type == 'ORDER_CREATED':
         order_id = notification.get('data', {}).get('orderId')
-        # TODO: trigger order processing workflow
+        try:
+            from retromonkey.services.workflow import WorkflowEngine
+            from retromonkey.app import db as _db
+            wf = WorkflowEngine(_db)
+            wf.trigger('order_received', {
+                'order_id': order_id,
+                'source': 'ebay',
+                'buyer': '',
+                'total': '0',
+                'items': '',
+            })
+        except Exception as exc:
+            logger.error("Failed to trigger workflow for eBay order %s: %s", order_id, exc)
 
     return jsonify({'status': 'ok'}), 200
 

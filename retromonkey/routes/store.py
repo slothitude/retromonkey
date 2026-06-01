@@ -45,15 +45,12 @@ def calculate_gst(total_dollars):
 
 
 def send_order_confirmation(order):
-    """Send order confirmation email (best effort)."""
-    smtp_host = current_app.config.get('SMTP_HOST')
-    if not smtp_host:
-        log.info("SMTP not configured, skipping confirmation email")
+    """Send order confirmation email via Resend (best effort)."""
+    if not order.buyer_email:
+        log.info("No buyer email, skipping confirmation for order #%s", order.id)
         return
     try:
-        import smtplib
-        from email.mime.text import MIMEText
-        from email.mime.multipart import MIMEMultipart
+        from retromonkey.services.resend_sender import send_email
 
         items = json.loads(order.items_json) if isinstance(order.items_json, str) else (order.items_json or [])
         gst = calculate_gst(order.total or 0)
@@ -64,7 +61,7 @@ def send_order_confirmation(order):
 
         html = f"""
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #6c5ce7;">Order Confirmed!</h1>
+            <h1 style="color: #00ff88;">Order Confirmed!</h1>
             <p>Thanks for your order, {order.buyer_name or 'valued customer'}!</p>
             <h2>Order #{order.id}</h2>
             <table style="width:100%; border-collapse: collapse;">
@@ -75,27 +72,21 @@ def send_order_confirmation(order):
             <p><strong>GST:</strong> ${gst:.2f}</p>
             <hr>
             <p style="color: #888; font-size: 12px;">
-                {current_app.config['BUSINESS_NAME']} ABN: {current_app.config['ABN']}<br>
+                {current_app.config.get('BUSINESS_NAME', 'RetroMonkey')} ABN: {current_app.config.get('ABN', '')}<br>
                 Prices include GST where applicable.
             </p>
         </div>
         """
 
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"RetroMonkey Order #{order.id} — Confirmed!"
-        msg["From"] = current_app.config["SMTP_FROM"]
-        msg["To"] = order.buyer_email
-        msg.attach(MIMEText(html, "html"))
+        send_email(
+            to=order.buyer_email,
+            subject=f"RetroMonkey Order #{order.id} — Confirmed!",
+            html=html,
+        )
 
-        with smtplib.SMTP(current_app.config["SMTP_HOST"], current_app.config["SMTP_PORT"]) as server:
-            server.starttls()
-            if current_app.config.get("SMTP_USER"):
-                server.login(current_app.config["SMTP_USER"], current_app.config["SMTP_PASS"])
-            server.sendmail(current_app.config["SMTP_FROM"], order.buyer_email, msg.as_string())
-
-        log.info("Order confirmation sent to %s for order #%s", order.buyer_email, order.id)
+        log.info("Order confirmation sent to %s for order #%s via Resend", order.buyer_email, order.id)
     except Exception:
-        log.exception("Failed to send order confirmation email")
+        log.exception("Failed to send order confirmation email via Resend")
 
 
 @store_bp.context_processor
@@ -377,8 +368,8 @@ def stripe_webhook():
                 )
                 db.session.add(oi)
 
-                # Decrement stock
-                if product.inventory:
+                # Decrement stock only if we hold inventory (skip for dropship)
+                if product.inventory and product.inventory.quantity_on_hand > 0:
                     product.inventory.quantity_on_hand = max(
                         0, product.inventory.quantity_on_hand - item.get("qty", 1)
                     )
@@ -389,6 +380,21 @@ def stripe_webhook():
 
         # Send confirmation email (best effort)
         send_order_confirmation(order)
+
+        # Trigger order_received workflow (best effort)
+        try:
+            import os
+            from retromonkey.services.workflow import WorkflowEngine
+            wf = WorkflowEngine(db)
+            wf.trigger('order_received', {
+                'order_id': order.id,
+                'source': 'web_store',
+                'buyer': order.buyer_name or '',
+                'total': f"{order.total:.2f}" if order.total else '0',
+                'items': order.items_json or '',
+            })
+        except Exception:
+            log.exception("Failed to trigger order workflow")
 
     return jsonify({"status": "ok"})
 

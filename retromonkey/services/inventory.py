@@ -145,3 +145,68 @@ class InventoryService:
                 'preferred_supplier': {'id': supplier.id, 'name': supplier.name} if supplier else None,
             })
         return results
+
+    def should_stock(self, product_id: int) -> dict:
+        """Advisory: should we hold inventory for this product instead of dropshipping?
+
+        Checks order frequency, margins, and supplier reliability.
+        Returns a recommendation dict with reasoning.
+        """
+        from retromonkey.models.order import OrderItem, Order
+        from retromonkey.models.supplier import Supplier, SupplierScore
+        from datetime import datetime, timedelta
+
+        product = self.db.session.get(Product, product_id)
+        if not product:
+            return {"should_stock": False, "reason": "Product not found"}
+
+        # Count orders in last 90 days
+        ninety_days_ago = datetime.utcnow() - timedelta(days=90)
+        order_count = (
+            self.db.session.query(OrderItem)
+            .join(Order)
+            .filter(OrderItem.product_id == product_id)
+            .filter(Order.ordered_at >= ninety_days_ago)
+            .count()
+        )
+
+        # Calculate margin
+        margin = 0
+        if product.cost_price and product.price and product.cost_price > 0:
+            margin = (product.price - product.cost_price) / product.price * 100
+
+        # Check supplier reliability
+        supplier = None
+        if product.cost_price:
+            supplier = self.db.session.query(Supplier).join(
+                SupplierScore, SupplierScore.supplier_id == Supplier.id
+            ).order_by(SupplierScore.overall_score.desc()).first()
+
+        # Decision logic
+        recommendation = {
+            "should_stock": False,
+            "product_id": product_id,
+            "product": product.title,
+            "orders_90d": order_count,
+            "margin_pct": round(margin, 1),
+            "cost_price": product.cost_price,
+            "sell_price": product.price,
+            "supplier_reliability": supplier.name if supplier else "no rated supplier",
+            "reason": "",
+            "threshold": "3+ orders/90d AND margin > 20% AND reliable supplier",
+        }
+
+        if order_count >= 3 and margin > 20 and supplier:
+            recommendation["should_stock"] = True
+            recommendation["reason"] = (
+                f"High demand ({order_count} orders/90d), good margin ({margin:.1f}%), "
+                f"reliable supplier ({supplier.name})"
+            )
+        elif order_count < 3:
+            recommendation["reason"] = f"Low demand ({order_count} orders/90d) — keep dropshipping"
+        elif margin <= 20:
+            recommendation["reason"] = f"Thin margin ({margin:.1f}%) — not worth holding stock"
+        elif not supplier:
+            recommendation["reason"] = "No rated supplier — cannot assess reliability"
+
+        return recommendation

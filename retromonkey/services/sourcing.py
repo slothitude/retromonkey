@@ -32,6 +32,11 @@ class SourcingService:
     ) -> list[dict]:
         """Search Alibaba for suppliers matching *keyword*.
 
+        .. warning::
+            Alibaba uses JS-rendered pages. The BeautifulSoup scraper
+            typically returns empty results. Use the ``sourcing_add_manual``
+            MCP tool for manual entry, or the AliExpress API connector.
+
         Parameters
         ----------
         keyword : str
@@ -45,6 +50,10 @@ class SourcingService:
         list[dict]
             Parsed supplier data dicts.
         """
+        logger.warning(
+            "Alibaba automated scraping is broken (JS-rendered pages). "
+            "Results will likely be empty. Use sourcing_add_manual MCP tool instead."
+        )
         filters = filters or {}
         raw_results = self._scrape_alibaba_search(keyword, filters)
 

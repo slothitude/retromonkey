@@ -288,6 +288,20 @@ class EbayConnector(BaseConnector):
                 'unit_price': float(li.get('total', {}).get('value', 0)),
                 'title': li.get('title', ''),
             })
+
+        # Extract shipping address
+        shipping = raw.get('shippingDetails', {})
+        address = shipping.get('shipTo', {}) if isinstance(shipping, dict) else {}
+        shipping_address = {
+            'name': address.get('fullName', ''),
+            'address_line_1': address.get('addressLine1', ''),
+            'address_line_2': address.get('addressLine2', ''),
+            'city': address.get('city', ''),
+            'state': address.get('stateOrProvince', ''),
+            'postcode': address.get('postalCode', ''),
+            'country': address.get('country', ''),
+        }
+
         return {
             'external_order_id': raw.get('orderId', ''),
             'buyer_name': raw.get('buyer', {}).get('username', ''),
@@ -297,6 +311,7 @@ class EbayConnector(BaseConnector):
             'currency': raw.get('pricingSummary', {}).get('total', {}).get('currency', 'AUD'),
             'items': items,
             'ordered_at': raw.get('creationDate', ''),
+            'shipping_address': shipping_address,
         }
 
     def _map_order_status(self, ebay_status: str) -> str:

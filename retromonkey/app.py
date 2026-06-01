@@ -80,6 +80,7 @@ def _setup_scheduler(app):
             from .models import Marketplace
             from .connectors.ebay import EbayConnector
             from .services.alert_service import AlertService
+            from .services.order_sync import OrderSyncService
             alert_svc = AlertService(db)
             for mp in Marketplace.query.filter_by(active=True).all():
                 if mp.name == 'eBay':
@@ -87,13 +88,14 @@ def _setup_scheduler(app):
                         conn = EbayConnector(mp, app.config)
                         if conn.is_authenticated():
                             orders = conn.get_orders()
-                            # Alert for new orders
                             if isinstance(orders, list):
-                                for order in orders:
-                                    if isinstance(order, dict):
-                                        alert_svc.alert_new_order(order)
-                    except Exception:
-                        pass
+                                sync_svc = OrderSyncService(db)
+                                for order_data in orders:
+                                    if isinstance(order_data, dict):
+                                        sync_svc.sync_order(order_data, mp.id)
+                                        alert_svc.alert_new_order(order_data)
+                    except Exception as exc:
+                        app.logger.error("poll_orders failed for %s: %s", mp.name, exc)
 
     @scheduler.task('interval', id='sync_inventory', minutes=30)
     def sync_inventory():
@@ -102,8 +104,8 @@ def _setup_scheduler(app):
                 from .services.sync import InventorySyncService
                 sync_svc = InventorySyncService(db, _connector_factory)
                 sync_svc.sync_all()
-            except Exception:
-                pass
+            except Exception as exc:
+                app.logger.error("sync_inventory failed: %s", exc)
 
     @scheduler.task('cron', id='reorder_check', hour=7)
     def reorder_check():
@@ -117,8 +119,8 @@ def _setup_scheduler(app):
                 for item in low if isinstance(low, list) else []:
                     if isinstance(item, dict):
                         alert_svc.alert_low_stock(item)
-            except Exception:
-                pass
+            except Exception as exc:
+                app.logger.error("reorder_check failed: %s", exc)
 
     @scheduler.task('cron', id='daily_checklist', hour=8, minute=30)
     def daily_checklist():
@@ -127,15 +129,15 @@ def _setup_scheduler(app):
                 from .services.task_manager import TaskManager
                 tm = TaskManager(db)
                 tm.generate_daily_checklist()
-            except Exception:
-                pass
+            except Exception as exc:
+                app.logger.error("daily_checklist failed: %s", exc)
             # Send morning briefing after checklist is generated
             try:
                 from .services.alert_service import AlertService
                 alert_svc = AlertService(db)
                 alert_svc.alert_morning_briefing()
-            except Exception:
-                pass
+            except Exception as exc:
+                app.logger.error("morning_briefing failed: %s", exc)
 
     @scheduler.task('cron', id='daily_summary', hour=18)
     def daily_summary():
@@ -161,8 +163,8 @@ def _setup_scheduler(app):
                         f"({summary['completion_pct']}%)"
                     )
                     db.session.commit()
-            except Exception:
-                pass
+            except Exception as exc:
+                app.logger.error("daily_summary failed: %s", exc)
 
     @scheduler.task('cron', id='weekly_report', day_of_week='mon', hour=9)
     def weekly_report():
@@ -171,8 +173,8 @@ def _setup_scheduler(app):
                 from .services.alert_service import AlertService
                 alert_svc = AlertService(db)
                 alert_svc.alert_weekly_report()
-            except Exception:
-                pass
+            except Exception as exc:
+                app.logger.error("weekly_report failed: %s", exc)
 
     @scheduler.task('cron', id='gmail_watch_renewal', hour=3)
     def gmail_watch_renewal():

@@ -23,6 +23,7 @@ class Product(db.Model):
     compare_price: Mapped[float | None] = mapped_column(Float)  # RRP / original price
     featured: Mapped[bool] = mapped_column(Boolean, default=False)
     badge: Mapped[str | None] = mapped_column(String(64))
+    supplier_url: Mapped[str | None] = mapped_column(String(512))  # Direct supplier link for dropship
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc),

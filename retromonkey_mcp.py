@@ -15,7 +15,7 @@ from retromonkey.app import create_app, db
 from retromonkey.models import (
     Product, Inventory, Marketplace, Listing, Order, OrderItem, Shipment,
     Transaction, Fee, Supplier, PurchaseOrder, RFQ, SupplierScore, Message,
-    Task,
+    Task, DropshipOrder,
 )
 
 app = create_app()
@@ -103,7 +103,9 @@ def svc_planner():
 
 def svc_workflow():
     from retromonkey.services.workflow import WorkflowEngine
-    return WorkflowEngine(db)
+    import os
+    workflows_dir = os.path.join(os.path.dirname(__file__), 'retromonkey', 'workflows')
+    return WorkflowEngine(db, workflows_dir=workflows_dir)
 
 
 def svc_gmail():
@@ -314,6 +316,11 @@ TOOLS = [
          'status': {'type': 'string'},
          'days': {'type': 'integer', 'default': 7}}}},
 
+    {'name': 'order_sync_ebay', 'description': 'Sync eBay orders into the local database. Fetches recent orders and creates Order + OrderItem records.',
+     'inputSchema': {'type': 'object', 'properties': {
+         'days': {'type': 'integer', 'default': 7, 'description': 'How many days back to sync'}},
+     'required': []}},
+
     {'name': 'ebay_ship', 'description': 'Mark an eBay order as shipped',
      'inputSchema': {'type': 'object', 'properties': {
          'order_id': {'type': 'string'}, 'carrier': {'type': 'string'},
@@ -461,6 +468,70 @@ TOOLS = [
          'event_type': {'type': 'string'},
          'event_data': {'type': 'object', 'default': {}}},
          'required': ['event_type']}},
+
+    # ---- Dropship ----
+    {'name': 'dropship_record', 'description': 'Record a dropship order — link an Order to a supplier with cost and order URL',
+     'inputSchema': {'type': 'object', 'properties': {
+         'order_id': {'type': 'integer', 'description': 'Local order ID'},
+         'supplier_id': {'type': 'integer', 'description': 'Supplier ID (optional)'},
+         'supplier_order_url': {'type': 'string', 'description': 'URL of the order on supplier site'},
+         'supplier_order_id': {'type': 'string', 'description': 'Order ID on supplier site'},
+         'unit_cost': {'type': 'number', 'description': 'Cost per unit from supplier'},
+         'currency': {'type': 'string', 'default': 'AUD'},
+         'notes': {'type': 'string'}},
+     'required': ['order_id', 'unit_cost']}},
+
+    {'name': 'dropship_update_tracking', 'description': 'Add supplier tracking number to a dropship order',
+     'inputSchema': {'type': 'object', 'properties': {
+         'dropship_id': {'type': 'integer', 'description': 'DropshipOrder ID'},
+         'tracking_number': {'type': 'string'}},
+     'required': ['dropship_id', 'tracking_number']}},
+
+    {'name': 'dropship_mark_shipped', 'description': 'Mark dropship order as shipped and update eBay if applicable',
+     'inputSchema': {'type': 'object', 'properties': {
+         'dropship_id': {'type': 'integer', 'description': 'DropshipOrder ID'},
+         'carrier': {'type': 'string', 'default': 'Standard Shipping'}},
+     'required': ['dropship_id']}},
+
+    {'name': 'dropship_list_pending', 'description': 'List all pending dropship orders',
+     'inputSchema': {'type': 'object', 'properties': {
+         'status': {'type': 'string', 'description': 'Filter by status (pending, ordered, tracking_received, shipped, delivered)'}},
+     'required': []}},
+
+    # ---- AliExpress ----
+    {'name': 'aliexpress_search', 'description': 'Search AliExpress for products to dropship',
+     'inputSchema': {'type': 'object', 'properties': {
+         'keywords': {'type': 'string'},
+         'page_size': {'type': 'integer', 'default': 20}},
+     'required': ['keywords']}},
+
+    {'name': 'aliexpress_product_detail', 'description': 'Get product details from AliExpress',
+     'inputSchema': {'type': 'object', 'properties': {
+         'product_id': {'type': 'string'}},
+     'required': ['product_id']}},
+
+    {'name': 'aliexpress_create_order', 'description': 'Create a dropship order on AliExpress',
+     'inputSchema': {'type': 'object', 'properties': {
+         'product_id': {'type': 'string'},
+         'address': {'type': 'object', 'description': 'Shipping address dict'},
+         'quantity': {'type': 'integer', 'default': 1}},
+     'required': ['product_id', 'address']}},
+
+    {'name': 'aliexpress_order_tracking', 'description': 'Get tracking info for an AliExpress dropship order',
+     'inputSchema': {'type': 'object', 'properties': {
+         'order_id': {'type': 'string'}},
+     'required': ['order_id']}},
+
+    {'name': 'sourcing_add_manual', 'description': 'Manually add a supplier entry (workaround for broken Alibaba scraper)',
+     'inputSchema': {'type': 'object', 'properties': {
+         'name': {'type': 'string'},
+         'platform': {'type': 'string', 'default': 'AliExpress'},
+         'url': {'type': 'string'},
+         'contact_email': {'type': 'string'},
+         'rating': {'type': 'number'},
+         'min_order_qty': {'type': 'integer'},
+         'notes': {'type': 'string'}},
+     'required': ['name']}},
 
     # ---- Communications ----
     {'name': 'comms_inbox', 'description': 'Get unified inbox across all channels',
@@ -706,6 +777,8 @@ HANDLERS = {
     'ebay_get_orders': _ctx(lambda a: _get_ebay().get_orders(
         {'status': a.get('status'), 'days': a.get('days', 7)})),
 
+    'order_sync_ebay': _ctx(lambda a: _order_sync_ebay(a)),
+
     'ebay_ship': _ctx(lambda a: _get_ebay().ship_order(
         a['order_id'], a['carrier'], a['tracking_number'])),
 
@@ -783,6 +856,19 @@ HANDLERS = {
 
     'workflow_trigger': _ctx(lambda a: svc_workflow().trigger(
         a['event_type'], a.get('event_data', {}))),
+
+    # ---- Dropship ----
+    'dropship_record': _ctx(lambda a: _dropship_record(a)),
+    'dropship_update_tracking': _ctx(lambda a: _dropship_update_tracking(a)),
+    'dropship_mark_shipped': _ctx(lambda a: _dropship_mark_shipped(a)),
+    'dropship_list_pending': _ctx(lambda a: _dropship_list_pending(a)),
+
+    # ---- AliExpress ----
+    'aliexpress_search': _ctx(lambda a: _aliexpress_search(a)),
+    'aliexpress_product_detail': _ctx(lambda a: _aliexpress_product_detail(a)),
+    'aliexpress_create_order': _ctx(lambda a: _aliexpress_create_order(a)),
+    'aliexpress_order_tracking': _ctx(lambda a: _aliexpress_order_tracking(a)),
+    'sourcing_add_manual': _ctx(lambda a: _sourcing_add_manual(a)),
 
     # ---- Communications ----
     'comms_inbox': _ctx(lambda a: svc_comms().get_unified_inbox(a.get('filters'))),
@@ -1032,6 +1118,169 @@ def _ebay_bulk_list(args):
             r = conn.list_item(product, {'title': product.title, 'price': price, 'quantity': 1})
             results.append(r)
     return results
+
+
+def _order_sync_ebay(args):
+    from retromonkey.services.order_sync import OrderSyncService
+    from retromonkey.models import Marketplace
+    conn = _get_ebay()
+    mp = db.session.query(Marketplace).filter_by(name='eBay', active=True).first()
+    if not mp:
+        raise ValueError("No active eBay marketplace configured")
+    days = args.get('days', 7)
+    orders = conn.get_orders()
+    sync_svc = OrderSyncService(db)
+    results = []
+    for order_data in (orders or []):
+        if isinstance(order_data, dict):
+            result = sync_svc.sync_order(order_data, mp.id)
+            results.append(result)
+    created = sum(1 for r in results if r.get('created'))
+    return {"total_fetched": len(results), "new_orders": created, "results": results}
+
+
+# ---- Dropship handlers ----
+
+def _dropship_record(args):
+    from datetime import datetime, timezone
+    order_id = args['order_id']
+    order = db.session.get(Order, order_id)
+    if not order:
+        raise ValueError(f"Order {order_id} not found")
+    ds = DropshipOrder(
+        order_id=order_id,
+        supplier_id=args.get('supplier_id'),
+        supplier_order_url=args.get('supplier_order_url'),
+        supplier_order_id=args.get('supplier_order_id'),
+        unit_cost=args.get('unit_cost'),
+        currency=args.get('currency', 'AUD'),
+        status='ordered',
+        notes=args.get('notes'),
+        ordered_at=datetime.now(timezone.utc),
+    )
+    db.session.add(ds)
+    db.session.commit()
+    return {"created": True, "dropship_id": ds.id, "order_id": order_id, "status": "ordered"}
+
+
+def _dropship_update_tracking(args):
+    from datetime import datetime, timezone
+    ds = db.session.get(DropshipOrder, args['dropship_id'])
+    if not ds:
+        raise ValueError(f"DropshipOrder {args['dropship_id']} not found")
+    ds.supplier_tracking = args['tracking_number']
+    ds.status = 'tracking_received'
+    ds.tracking_received_at = datetime.now(timezone.utc)
+    # Also update the parent order tracking
+    ds.order.tracking = args['tracking_number']
+    db.session.commit()
+    return {"updated": True, "dropship_id": ds.id, "tracking": args['tracking_number'], "status": "tracking_received"}
+
+
+def _dropship_mark_shipped(args):
+    from datetime import datetime, timezone
+    ds = db.session.get(DropshipOrder, args['dropship_id'])
+    if not ds:
+        raise ValueError(f"DropshipOrder {args['dropship_id']} not found")
+    ds.status = 'shipped'
+    ds.shipped_at = datetime.now(timezone.utc)
+    ds.order.status = 'shipped'
+    ds.order.shipped_at = datetime.now(timezone.utc)
+    carrier = args.get('carrier', 'Standard Shipping')
+    result = {"updated": True, "dropship_id": ds.id, "status": "shipped"}
+
+    # If this is an eBay order, call ship_order
+    if ds.order.external_order_id and ds.supplier_tracking:
+        try:
+            mp = db.session.query(Marketplace).filter_by(name='eBay', active=True).first()
+            if mp:
+                conn = _get_ebay()
+                ship_result = conn.ship_order(
+                    ds.order.external_order_id, carrier, ds.supplier_tracking
+                )
+                result['ebay_ship'] = ship_result
+        except Exception as exc:
+            result['ebay_ship_error'] = str(exc)
+
+    db.session.commit()
+    return result
+
+
+def _dropship_list_pending(args):
+    query = db.session.query(DropshipOrder).order_by(DropshipOrder.created_at.desc())
+    status_filter = args.get('status')
+    if status_filter:
+        query = query.filter_by(status=status_filter)
+    else:
+        query = query.filter(DropshipOrder.status.in_(['pending', 'ordered', 'tracking_received']))
+    results = []
+    for ds in query.limit(50).all():
+        results.append({
+            'id': ds.id,
+            'order_id': ds.order_id,
+            'order_total': ds.order.total if ds.order else None,
+            'buyer': ds.order.buyer_name if ds.order else None,
+            'supplier_id': ds.supplier_id,
+            'unit_cost': ds.unit_cost,
+            'currency': ds.currency,
+            'status': ds.status,
+            'tracking': ds.supplier_tracking,
+            'created_at': ds.created_at.isoformat() if ds.created_at else None,
+            'notes': ds.notes,
+        })
+    return {"count": len(results), "orders": results}
+
+
+# ---- AliExpress handlers ----
+
+def _get_aliexpress():
+    from retromonkey.services.aliexpress import AliExpressConnector
+    return AliExpressConnector()
+
+
+def _aliexpress_search(args):
+    ae = _get_aliexpress()
+    if not ae.is_configured:
+        raise RuntimeError("AliExpress API not configured (set ALIEXPRESS_APP_KEY and ALIEXPRESS_APP_SECRET)")
+    return ae.search_products(args['keywords'], args.get('page_size', 20))
+
+
+def _aliexpress_product_detail(args):
+    ae = _get_aliexpress()
+    if not ae.is_configured:
+        raise RuntimeError("AliExpress API not configured")
+    return ae.get_product_details(args['product_id'])
+
+
+def _aliexpress_create_order(args):
+    ae = _get_aliexpress()
+    if not ae.is_configured:
+        raise RuntimeError("AliExpress API not configured")
+    if not ae.access_token:
+        raise RuntimeError("AliExpress access token not set (ALIEXPRESS_ACCESS_TOKEN)")
+    return ae.create_order(args['product_id'], args['address'], args.get('quantity', 1))
+
+
+def _aliexpress_order_tracking(args):
+    ae = _get_aliexpress()
+    if not ae.is_configured:
+        raise RuntimeError("AliExpress API not configured")
+    return ae.get_order_tracking(args['order_id'])
+
+
+def _sourcing_add_manual(args):
+    supplier = Supplier(
+        name=args['name'],
+        platform=args.get('platform', 'AliExpress'),
+        url=args.get('url'),
+        contact_email=args.get('contact_email'),
+        rating=args.get('rating'),
+        min_order_qty=args.get('min_order_qty'),
+        notes=args.get('notes'),
+    )
+    db.session.add(supplier)
+    db.session.commit()
+    return {"id": supplier.id, "name": supplier.name, "created": True}
 
 
 def _ebay_update_price(args):

@@ -72,3 +72,27 @@ class SupplierScore(db.Model):
     communication_rating: Mapped[float | None] = mapped_column(Float)
     overall_score: Mapped[float | None] = mapped_column(Float)
     notes: Mapped[str | None] = mapped_column(Text)
+
+
+class DropshipOrder(db.Model):
+    __tablename__ = 'dropship_orders'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_id: Mapped[int] = mapped_column(Integer, ForeignKey('orders.id'), nullable=False, index=True)
+    supplier_id: Mapped[int | None] = mapped_column(Integer, ForeignKey('suppliers.id'), nullable=True)
+    supplier_order_url: Mapped[str | None] = mapped_column(String(512))
+    supplier_order_id: Mapped[str | None] = mapped_column(String(128))
+    supplier_tracking: Mapped[str | None] = mapped_column(String(128))
+    unit_cost: Mapped[float | None] = mapped_column(Float)
+    currency: Mapped[str] = mapped_column(String(3), default='AUD')
+    status: Mapped[str] = mapped_column(String(24), default='pending', index=True)
+    notes: Mapped[str | None] = mapped_column(Text)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    ordered_at: Mapped[datetime | None] = mapped_column(DateTime)
+    tracking_received_at: Mapped[datetime | None] = mapped_column(DateTime)
+    shipped_at: Mapped[datetime | None] = mapped_column(DateTime)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+    order: Mapped["Order"] = relationship("Order", backref="dropship_orders")
+    supplier: Mapped["Supplier"] = relationship("Supplier", backref="dropship_orders")
