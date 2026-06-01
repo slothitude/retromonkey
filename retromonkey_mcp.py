@@ -522,6 +522,13 @@ TOOLS = [
          'order_id': {'type': 'string'}},
      'required': ['order_id']}},
 
+    {'name': 'aliexpress_oauth_url', 'description': 'Generate AliExpress OAuth authorization URL. Open in browser to authorize.',
+     'inputSchema': {'type': 'object', 'properties': {
+         'redirect_uri': {'type': 'string', 'description': 'Override redirect URI (defaults to production)'}}}},
+
+    {'name': 'aliexpress_token_status', 'description': 'Check AliExpress OAuth token status (valid, expired, missing)',
+     'inputSchema': {'type': 'object', 'properties': {}}},
+
     {'name': 'sourcing_add_manual', 'description': 'Manually add a supplier entry (workaround for broken Alibaba scraper)',
      'inputSchema': {'type': 'object', 'properties': {
          'name': {'type': 'string'},
@@ -868,6 +875,8 @@ HANDLERS = {
     'aliexpress_product_detail': _ctx(lambda a: _aliexpress_product_detail(a)),
     'aliexpress_create_order': _ctx(lambda a: _aliexpress_create_order(a)),
     'aliexpress_order_tracking': _ctx(lambda a: _aliexpress_order_tracking(a)),
+    'aliexpress_oauth_url': _ctx(lambda a: _aliexpress_oauth_url(a)),
+    'aliexpress_token_status': _ctx(lambda a: _aliexpress_token_status(a)),
     'sourcing_add_manual': _ctx(lambda a: _sourcing_add_manual(a)),
 
     # ---- Communications ----
@@ -1265,7 +1274,50 @@ def _aliexpress_order_tracking(args):
     ae = _get_aliexpress()
     if not ae.is_configured:
         raise RuntimeError("AliExpress API not configured")
+    if not ae.access_token:
+        raise RuntimeError("AliExpress access token not set. Run aliexpress_oauth_url to start OAuth flow.")
     return ae.get_order_tracking(args['order_id'])
+
+
+def _aliexpress_oauth_url(args):
+    import time
+    ae = _get_aliexpress()
+    if not ae.is_configured:
+        raise RuntimeError("AliExpress API not configured (set ALIEXPRESS_APP_KEY and ALIEXPRESS_APP_SECRET)")
+    redirect_uri = args.get('redirect_uri', 'https://retromonkey.com.au/webhooks/aliexpress')
+    state = str(int(time.time()))
+    url = ae.get_auth_url(redirect_uri, state=state)
+    return {
+        'auth_url': url,
+        'redirect_uri': redirect_uri,
+        'app_key': ae.app_key,
+        'instructions': 'Open this URL in a browser, log in with the AliExpress developer account, and approve access. The callback will save tokens automatically.',
+    }
+
+
+def _aliexpress_token_status(args):
+    import time
+    ae = _get_aliexpress()
+    configured = ae.is_configured
+    has_token = bool(ae.access_token)
+    is_valid = ae.has_valid_token
+    has_refresh = bool(ae.refresh_token)
+    expires_at = ae.token_expires_at
+
+    if not configured:
+        return {'status': 'not_configured', 'message': 'Missing ALIEXPRESS_APP_KEY or ALIEXPRESS_APP_SECRET'}
+    if not has_token:
+        return {'status': 'no_token', 'message': 'No access token. Run aliexpress_oauth_url to start OAuth flow.'}
+    if not is_valid:
+        if has_refresh:
+            return {'status': 'expired_refreshable', 'message': 'Token expired but refresh_token available. API calls will auto-refresh.', 'expires_at': time.ctime(expires_at)}
+        return {'status': 'expired', 'message': 'Token expired and no refresh_token. Re-authorize via aliexpress_oauth_url.', 'expires_at': time.ctime(expires_at)}
+    return {
+        'status': 'valid',
+        'message': 'Token valid and ready for API calls.',
+        'expires_at': time.ctime(expires_at),
+        'expires_in_seconds': int(expires_at - time.time()),
+    }
 
 
 def _sourcing_add_manual(args):

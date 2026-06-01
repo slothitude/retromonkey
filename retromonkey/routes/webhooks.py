@@ -8,6 +8,65 @@ webhook_bp = Blueprint('webhooks', __name__)
 logger = logging.getLogger(__name__)
 
 
+# ── AliExpress OAuth ──
+
+@webhook_bp.route('/webhooks/aliexpress', methods=['GET'])
+def aliexpress_oauth_callback():
+    """Handle AliExpress OAuth callback — exchange code for tokens.
+
+    The authorization flow redirects here with ?code=xxx after the user
+    approves the app on AliExpress.
+    """
+    from flask import current_app
+
+    code = request.args.get('code', '')
+    error = request.args.get('error', '')
+    error_desc = request.args.get('error_description', '')
+
+    if error:
+        logger.error("AliExpress OAuth error: %s — %s", error, error_desc)
+        return f"<h2>AliExpress OAuth Failed</h2><p>{error}: {error_desc}</p>", 400
+
+    if not code:
+        return "<h2>No authorization code received</h2><p>The OAuth flow did not return a code.</p>", 400
+
+    logger.info("AliExpress OAuth callback received with code=%s...", code[:20])
+
+    try:
+        from retromonkey.services.aliexpress import AliExpressConnector
+        ae = AliExpressConnector()
+        redirect_uri = (
+            f"{current_app.config.get('SITE_URL', 'https://retromonkey.com.au')}"
+            "/webhooks/aliexpress"
+        )
+        result = ae.exchange_code_for_token(code, redirect_uri)
+
+        # Notify via Telegram
+        try:
+            from retromonkey.services.telegram_client import TelegramClient
+            tg = TelegramClient()
+            if tg.is_configured:
+                tg.send_message(
+                    f"<b>AliExpress OAuth Success</b>\n"
+                    f"Access token: {result.get('access_token', 'N/A')}\n"
+                    f"User: {result.get('user_nick', 'N/A')}\n"
+                    f"Expires in: {result.get('expires_in', '?')}s",
+                    parse_mode="HTML",
+                )
+        except Exception:
+            pass
+
+        return f"""
+        <h2>AliExpress OAuth Success!</h2>
+        <p>Access token saved. You can close this tab.</p>
+        <pre>{json.dumps({k: v for k, v in result.items() if k != 'saved'}, indent=2)}</pre>
+        """, 200
+
+    except Exception as exc:
+        logger.error("AliExpress OAuth token exchange failed: %s", exc)
+        return f"<h2>Token Exchange Failed</h2><p>{exc}</p>", 500
+
+
 @webhook_bp.route('/webhooks/ebay', methods=['POST'])
 def ebay_webhook():
     data = request.json
