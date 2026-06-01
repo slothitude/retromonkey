@@ -14,14 +14,6 @@
   - Do in eBay Seller Hub > Account > Payments
   - Email ref: #f6609940b1704139a99560b3d59b836a#
 
-## Deployment & Verification
-
-- [ ] **Deploy workflow overhaul to Oracle**
-  - Two commits ready: `6a7a94f` (overhaul) + `7d071ff` (audit fixes)
-  - Run `./deploy.sh` from Rog, health check after
-  - Test: trigger `order_sync_ebay` MCP tool → verify Order appears in DB
-  - Test: trigger workflow via `workflow_trigger` → verify Telegram/email fires
-
 ## Code — Remaining Audit Items
 
 - [ ] **M2: AliExpress API signature validation**
@@ -37,20 +29,9 @@
   - `_dropship_mark_shipped` commits even if `conn.ship_order()` fails
   - Should rollback or at least not mark as shipped
 
-- [ ] **M6: Alembic migration for DropshipOrder table**
-  - Currently relies on `db.create_all()` — fine for now but add proper migration
-  - Run `alembic revision --autogenerate -m "add dropship_orders table"`
-
 - [ ] **M8: Fix eBay order confirmation email template**
   - `send_order_confirmation()` uses `name/qty/price` keys but order_sync stores `sku/quantity/unit_price`
   - Confirmation emails for eBay-synced orders show blank items
-
-- [ ] **M9: eBay webhook signature verification**
-  - `webhooks.py` eBay handler doesn't verify the X-API-Signature header
-  - Anyone could POST fake order events
-  - Low priority (webhook endpoint is behind obscurity)
-
-## Code — Doc/Metadata Fixes
 
 - [ ] **L2: Update WORKFLOWS.md**
   - Still says workflows are "Missing"/"Broken" that were fixed in the overhaul
@@ -68,22 +49,6 @@
 
 - [ ] **Verify age on retromonkey.com.au Google account**
   - SafeSearch forced on, personalised ads off, Timeline off
-
-## Email Monitoring
-
-- [x] **Build IMAP email polling monitor** (2 Jun 2026)
-  - NEW `retromonkey/services/imap_monitor.py` — IMAPMonitor class (poll Gmail via IMAP SSL)
-  - Scheduler job `imap_poll` every 5 min in `app.py`
-  - Sender rules with **human checkpoints**: customer/supplier emails get Telegram inline buttons
-  - Auto-processes routine emails (eBay notifications, Stripe receipts)
-  - Human approval needed for: buyer inquiries, customer questions, supplier quotes, Stripe disputes
-
-- [ ] **Set up Gmail App Password for IMAP**
-  - Go to https://myaccount.google.com/apppasswords
-  - Generate app password for "RetroMonkey"
-  - Add `IMAP_PASSWORD=<app-password>` to `.env` on Oracle
-  - `IMAP_USER=retromonkey.com.au@gmail.com` (default, may not need to set)
-  - **Cannot deploy IMAP monitor until this is done**
 
 ## AliExpress API
 
@@ -132,3 +97,15 @@
   - [x] H6: Fix stock validation for dropship
   - [x] H7: Fix datetime.utcnow() → datetime.now(timezone.utc)
   - [x] M3: Wire workflow triggers with YAML templates
+- [x] **Deploy to Oracle** (2 Jun 2026)
+  - [x] All 3 commits pushed + deployed (overhaul, audit, IMAP)
+  - [x] DB migrated (added supplier_url, Order.source, Order.created_at, dropship_orders table)
+  - [x] Health check passing
+- [x] **IMAP email monitor** (2 Jun 2026)
+  - [x] `retromonkey/services/imap_monitor.py` — polls Gmail every 5 min
+  - [x] Human checkpoints via Telegram inline buttons
+  - [x] Gmail app password configured on Oracle
+  - [x] Tested: 5 messages processed, 2 alerts, 1 waiting human
+- [x] **Set up Gmail App Password** (21 May 2026)
+  - [x] App password: `mgvd wwbf cxns jcck` (RetroMonkey Store)
+  - [x] Added to Oracle .env as `IMAP_PASSWORD`

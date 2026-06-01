@@ -329,19 +329,23 @@ class EbayConnector(BaseConnector):
         resp.raise_for_status()
         return self._parse_order(resp.json())
 
-    def ship_order(self, external_order_id: str, carrier: str, tracking_number: str) -> dict:
+    def ship_order(self, external_order_id: str, carrier: str = '', tracking_number: str = '',
+                   line_item_id: str = '') -> dict:
         self._rate_limit('ship')
+        body = {}
+        if line_item_id:
+            body['lineItems'] = [{'lineItemId': line_item_id}]
+        if tracking_number:
+            body['shipmentTrackingNumber'] = tracking_number
+        if carrier:
+            body['shippingCarrierCode'] = carrier
         resp = http_requests.post(
             f"{self.base_url}/sell/fulfillment/v1/order/{external_order_id}/shipping_fulfillment",
             headers=self._headers(),
-            json={
-                'lineItems': [],
-                'shipmentTrackingNumber': tracking_number,
-                'shippingCarrierCode': carrier,
-            }
+            json=body
         )
         resp.raise_for_status()
-        return {'status': 'shipped', 'fulfillment_id': resp.json().get('fulfillmentId')}
+        return {'status': 'shipped', 'fulfillment_id': resp.json().get('fulfillmentId', '')}
 
     def search(self, query: str, filters: dict = None) -> list[dict]:
         params = {'q': query, 'limit': 50}
