@@ -19,7 +19,9 @@ def ebay_webhook():
         try:
             from retromonkey.services.workflow import WorkflowEngine
             from retromonkey.app import db as _db
-            wf = WorkflowEngine(_db)
+            import os as _os
+            wf_dir = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', 'workflows')
+            wf = WorkflowEngine(_db, workflows_dir=wf_dir)
             wf.trigger('order_received', {
                 'order_id': order_id,
                 'source': 'ebay',
@@ -273,7 +275,7 @@ def _handle_callback(callback: dict):
                             lines = []
                             for o in orders[:10]:
                                 if isinstance(o, dict):
-                                    lines.append(f"#{o.get('order_id', '?')} - ${o.get('total', '0')} ({o.get('source', 'ebay')})")
+                                    lines.append(f"#{o.get('external_order_id', '?')} - ${o.get('total', '0')} ({o.get('source', 'ebay')})")
                             msg = f"<b>eBay Orders ({len(orders)})</b>\n" + "\n".join(lines)
                         else:
                             msg = "<b>eBay Orders</b>\nNo new orders"
@@ -508,9 +510,9 @@ def _cmd_status(db_instance):
 
 def _cmd_orders(db_instance):
     from retromonkey.models.order import Order
-    from datetime import datetime, timedelta
-    since = datetime.utcnow() - timedelta(days=7)
-    orders = db_instance.session.query(Order).filter(Order.created_at >= since).order_by(Order.created_at.desc()).limit(10).all()
+    from datetime import datetime, timedelta, timezone
+    since = datetime.now(timezone.utc) - timedelta(days=7)
+    orders = db_instance.session.query(Order).filter(Order.ordered_at >= since).order_by(Order.ordered_at.desc()).limit(10).all()
     if not orders:
         return "<b>Orders</b>\nNo orders in the last 7 days"
     lines = []
@@ -586,7 +588,7 @@ def _cmd_ebay(db_instance):
                 lines.append(f"<b>eBay Orders ({len(orders)})</b>")
                 for o in orders[:5]:
                     if isinstance(o, dict):
-                        lines.append(f"  #{o.get('order_id', '?')} — ${o.get('total', '0')}")
+                        lines.append(f"  #{o.get('external_order_id', '?')} — ${o.get('total', '0')}")
             else:
                 lines.append("<b>eBay Orders</b>\n  No new orders")
         else:

@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone, timedelta
 from retromonkey.app import db
 from retromonkey.models.product import Product
 from retromonkey.models.inventory import Inventory
@@ -161,7 +162,7 @@ class InventoryService:
             return {"should_stock": False, "reason": "Product not found"}
 
         # Count orders in last 90 days
-        ninety_days_ago = datetime.utcnow() - timedelta(days=90)
+        ninety_days_ago = datetime.now(timezone.utc) - timedelta(days=90)
         order_count = (
             self.db.session.query(OrderItem)
             .join(Order)

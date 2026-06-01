@@ -6,11 +6,9 @@ Env vars: ALIEXPRESS_APP_KEY, ALIEXPRESS_APP_SECRET, ALIEXPRESS_ACCESS_TOKEN
 
 import hashlib
 import hmac
-import json
 import logging
 import os
 import time
-import uuid
 from urllib.parse import urlencode
 
 import httpx

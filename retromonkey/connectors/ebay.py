@@ -282,10 +282,13 @@ class EbayConnector(BaseConnector):
     def _parse_order(self, raw: dict) -> dict:
         items = []
         for li in raw.get('lineItems', []):
+            qty = li.get('quantity', 1)
+            line_total = float(li.get('total', {}).get('value', 0))
+            unit_price = round(line_total / qty, 2) if qty else line_total
             items.append({
                 'sku': li.get('sku', ''),
-                'quantity': li.get('quantity', 0),
-                'unit_price': float(li.get('total', {}).get('value', 0)),
+                'quantity': qty,
+                'unit_price': unit_price,
                 'title': li.get('title', ''),
             })
 

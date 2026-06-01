@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app
 from functools import wraps
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from retromonkey.app import db
 from retromonkey.models.product import Product
 from retromonkey.models.order import Order, OrderItem, Shipment
@@ -38,7 +38,7 @@ def health():
 def health_detailed():
     """Detailed health endpoint for the store agent."""
     product_count = db.session.query(Product).count()
-    since = datetime.utcnow() - timedelta(hours=24)
+    since = datetime.now(timezone.utc) - timedelta(hours=24)
     orders_24h = db.session.query(Order).filter(Order.ordered_at >= since).count()
     low_stock = len(inv_svc.get_low_stock_products()) if hasattr(inv_svc, 'get_low_stock_products') else 0
     marketplaces = {}
@@ -51,7 +51,7 @@ def health_detailed():
         'orders_24h': orders_24h,
         'low_stock': low_stock,
         'marketplaces': marketplaces,
-        'timestamp': datetime.utcnow().isoformat(),
+        'timestamp': datetime.now(timezone.utc).isoformat(),
     })
 
 

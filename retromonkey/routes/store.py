@@ -177,7 +177,7 @@ def cart_add():
         return redirect(url_for("store.index"))
 
     cart = get_cart()
-    max_qty = product.stock or 10
+    max_qty = product.stock if product.stock > 0 else 10
     for item in cart:
         if item["id"] == product_id:
             item["qty"] = min(item["qty"] + qty, max_qty)
@@ -256,8 +256,8 @@ def create_checkout_session():
         if price <= 0:
             continue
 
-        # Stock validation
-        if p.stock < ci["qty"]:
+        # Stock validation (skip for dropship products with no local stock)
+        if p.stock > 0 and p.stock < ci["qty"]:
             return jsonify({"error": f"Not enough stock for {p.title}"}), 400
 
         line_items.append({
@@ -385,7 +385,8 @@ def stripe_webhook():
         try:
             import os
             from retromonkey.services.workflow import WorkflowEngine
-            wf = WorkflowEngine(db)
+            wf_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'workflows')
+            wf = WorkflowEngine(db, workflows_dir=wf_dir)
             wf.trigger('order_received', {
                 'order_id': order.id,
                 'source': 'web_store',

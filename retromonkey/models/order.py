@@ -12,6 +12,7 @@ class Order(db.Model):
     external_order_id: Mapped[str | None] = mapped_column(String(128), index=True)
     buyer_name: Mapped[str | None] = mapped_column(String(128))
     buyer_email: Mapped[str | None] = mapped_column(String(256))
+    source: Mapped[str | None] = mapped_column(String(16))  # 'ebay', 'web_store', 'amazon', etc.
     status: Mapped[str] = mapped_column(String(16), default='pending', index=True)
     total: Mapped[float | None] = mapped_column(Float)
     currency: Mapped[str] = mapped_column(String(3), default='AUD')
@@ -26,6 +27,7 @@ class Order(db.Model):
     items_json: Mapped[str | None] = mapped_column(Text)
     gst: Mapped[float | None] = mapped_column(Float)     # GST component
     tracking: Mapped[str | None] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     items: Mapped[list["OrderItem"]] = relationship("OrderItem", backref="order")
     shipments: Mapped[list["Shipment"]] = relationship("Shipment", backref="order")

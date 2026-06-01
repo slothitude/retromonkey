@@ -102,9 +102,15 @@ class OrderSyncService:
             if sku:
                 product = self.db.session.query(Product).filter_by(sku=sku).first()
 
+            # Only create OrderItem if we have a matching product (NOT NULL constraint)
+            if not product:
+                logger.warning("Order %s item '%s' — SKU '%s' not found locally, skipping OrderItem",
+                               order.id, item_data.get('title', '?'), sku)
+                continue
+
             oi = OrderItem(
                 order_id=order.id,
-                product_id=product.id if product else None,
+                product_id=product.id,
                 quantity=qty,
                 unit_price=unit_price,
                 subtotal=unit_price * qty,
