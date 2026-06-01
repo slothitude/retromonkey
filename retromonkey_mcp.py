@@ -563,6 +563,16 @@ TOOLS = [
          'reply_to_message_id': {'type': 'string'}},
          'required': ['to', 'subject', 'body']}},
 
+    {'name': 'email_send', 'description': 'Send an email via Resend from any @retromonkey.com.au address',
+     'inputSchema': {'type': 'object', 'properties': {
+         'to': {'type': 'string', 'description': 'Recipient email'},
+         'subject': {'type': 'string', 'description': 'Email subject'},
+         'html': {'type': 'string', 'description': 'HTML body'},
+         'text': {'type': 'string', 'description': 'Plain text body (fallback if no html)'},
+         'from_addr': {'type': 'string', 'description': 'Sender address (any @retromonkey.com.au, default: orders@)'},
+         'reply_to': {'type': 'string', 'description': 'Reply-To header'}},
+         'required': ['to', 'subject']}},
+
     {'name': 'gmail_label', 'description': 'Apply a label to a Gmail message',
      'inputSchema': {'type': 'object', 'properties': {
          'message_id': {'type': 'string'},
@@ -830,6 +840,11 @@ HANDLERS = {
         thread_id=a.get('thread_id'),
         reply_to_message_id=a.get('reply_to_message_id'))),
 
+    'email_send': _ctx(lambda a: _resend_send(
+        to=a['to'], subject=a['subject'],
+        html=a.get('html', ''), text=a.get('text', ''),
+        from_addr=a.get('from_addr'), reply_to=a.get('reply_to'))),
+
     'gmail_label': _ctx(lambda a: svc_gmail().apply_label(a['message_id'], a['label_name'])),
 
     'gmail_watch_start': _ctx(lambda a: _gmail_watch_start()),
@@ -898,6 +913,16 @@ def _gmail_watch_status():
         'topic_configured': bool(app.config.get('GOOGLE_PUBSUB_TOPIC', '')),
         'topic': app.config.get('GOOGLE_PUBSUB_TOPIC', ''),
     }
+
+
+def _resend_send(to, subject, html='', text='', from_addr=None, reply_to=None):
+    """Send email via Resend API from any @retromonkey.com.au address."""
+    from retromonkey.services.resend_sender import send_email
+    return send_email(
+        to=to, subject=subject,
+        html=html, text=text,
+        from_addr=from_addr, reply_to=reply_to,
+    )
 
 
 def _product_delete(product_id):

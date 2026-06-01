@@ -66,6 +66,9 @@ class Config:
     GOOGLE_PUBSUB_TOPIC = os.environ.get('GOOGLE_PUBSUB_TOPIC', '')
     GOOGLE_GMAIL_WATCH_ENABLED = os.environ.get('GOOGLE_GMAIL_WATCH_ENABLED', 'false').lower() == 'true'
 
+    # Resend (transactional email from @retromonkey.com.au)
+    RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
+
     # Telegram Alerts
     TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
     TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', '')

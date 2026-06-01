@@ -56,18 +56,32 @@ class AlertService:
         """
         results = {"email": None, "telegram": None}
 
-        # Email
+        # Email via Resend
         try:
-            gmail = self._gmail()
-            gmail.send_email(
+            from retromonkey.services.resend_sender import send_email
+            html_body = html_text.replace("\n", "<br>") if html_text else plain_text.replace("\n", "<br>")
+            send_email(
                 to=self.alert_email,
                 subject=subject,
-                body=plain_text,
+                html=f"<div style='font-family:sans-serif'>{html_body}</div>",
+                text=plain_text,
+                from_addr="alerts@retromonkey.com.au",
             )
             results["email"] = "sent"
         except Exception as exc:
-            logger.error("Alert email failed: %s", exc)
-            results["email"] = f"failed: {exc}"
+            logger.error("Alert email via Resend failed: %s", exc)
+            # Fallback to Gmail
+            try:
+                gmail = self._gmail()
+                gmail.send_email(
+                    to=self.alert_email,
+                    subject=subject,
+                    body=plain_text,
+                )
+                results["email"] = "sent (gmail fallback)"
+            except Exception as exc2:
+                logger.error("Alert email fallback also failed: %s", exc2)
+                results["email"] = f"failed: {exc}"
 
         # Telegram
         if self.telegram_enabled:

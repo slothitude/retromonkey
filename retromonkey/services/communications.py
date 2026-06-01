@@ -192,13 +192,14 @@ class CommunicationsService:
     # ------------------------------------------------------------------
 
     def _send_via_gmail(self, message: Message) -> bool:
-        """Send a message through the Gmail API."""
-        from retromonkey.services.gmail_client import GmailClient
-        gmail = GmailClient(self.db)
-        result = gmail.send_email(
+        """Send a message via Resend (from @retromonkey.com.au)."""
+        from retromonkey.services.resend_sender import send_email
+        result = send_email(
             to=message.to_addr or "",
             subject=message.subject or "",
-            body=message.body or "",
+            html=f"<div style='font-family:sans-serif'>{message.body or ''}</div>",
+            text=message.body or "",
+            from_addr="support@retromonkey.com.au",
         )
         return bool(result.get("id"))
 

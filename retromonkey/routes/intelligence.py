@@ -76,7 +76,15 @@ def gmail_callback():
         tokens = gmail.exchange_code(code)
         return jsonify({"status": "authenticated", "token_type": tokens.get("token_type")})
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        # Fallback: try with explicit redirect URI from config
+        try:
+            tokens = gmail.exchange_code(
+                code,
+                redirect_uri=current_app.config.get("GMAIL_REDIRECT_URI"),
+            )
+            return jsonify({"status": "authenticated", "token_type": tokens.get("token_type")})
+        except Exception as e2:
+            return jsonify({"error": f"{e}; fallback: {e2}"}), 400
 
 
 @intelligence_bp.route("/gmail/messages")
