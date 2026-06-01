@@ -202,30 +202,51 @@ def _handle_callback(callback: dict):
 
     logger.info("Telegram callback: %s", callback_data)
 
-    parts = callback_data.split(':', 1)
+    parts = callback_data.split(':', 2)
     action = parts[0] if parts else ''
-    payload = parts[1] if len(parts) > 1 else ''
+    source = parts[1] if len(parts) > 1 else ''
+    payload = parts[2] if len(parts) > 2 else (parts[1] if len(parts) > 1 else '')
 
     tg = TelegramClient()
     result_text = "Action received"
 
     try:
         if action == 'mark_read' and payload:
-            from retromonkey.services.gmail_client import GmailClient
-            gmail = GmailClient(db)
-            service = gmail._get_service()
-            service.users().messages().modify(
-                userId='me', id=payload,
-                body={'removeLabelIds': ['UNREAD']}
-            ).execute()
-            result_text = "Marked as read"
+            if source == 'email':
+                # IMAP-based mark read
+                from retromonkey.services.imap_monitor import IMAPMonitor
+                monitor = IMAPMonitor(current_app.config)
+                monitor.mark_read(payload)
+                monitor.close()
+                result_text = "Marked as read"
+            else:
+                # Legacy Gmail API mark read (fallback)
+                try:
+                    from retromonkey.services.gmail_client import GmailClient
+                    gmail = GmailClient(db)
+                    service = gmail._get_service()
+                    service.users().messages().modify(
+                        userId='me', id=payload,
+                        body={'removeLabelIds': ['UNREAD']}
+                    ).execute()
+                    result_text = "Marked as read"
+                except Exception:
+                    result_text = "Mark as read failed (Gmail API unavailable)"
 
         elif action == 'draft_reply' and payload:
-            from retromonkey.services.communications import CommunicationsService
-            from retromonkey.services.llm_router import LLMRouter
-            comms = CommunicationsService(db, LLMRouter())
-            draft = comms.draft_reply(int(payload))
-            result_text = f"Draft created: {draft.get('body', '')[:100]}..."
+            if source == 'email':
+                # IMAP email — draft reply via sender rules
+                from retromonkey.services.imap_monitor import IMAPMonitor
+                monitor = IMAPMonitor(current_app.config)
+                monitor.mark_read(payload)
+                monitor.close()
+                result_text = "Noted — reply pending. Email marked as read."
+            else:
+                from retromonkey.services.communications import CommunicationsService
+                from retromonkey.services.llm_router import LLMRouter
+                comms = CommunicationsService(db, LLMRouter())
+                draft = comms.draft_reply(int(payload))
+                result_text = f"Draft created: {draft.get('body', '')[:100]}..."
 
         elif action == 'view_order' and payload:
             result_text = f"Order #{payload}"

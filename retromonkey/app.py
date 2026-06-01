@@ -191,6 +191,20 @@ def _setup_scheduler(app):
             except Exception as exc:
                 app.logger.warning("Gmail watch renewal failed: %s", exc)
 
+    @scheduler.task('interval', id='imap_poll', minutes=5)
+    def imap_poll():
+        """Poll Gmail via IMAP for new unread messages, apply sender rules."""
+        with app.app_context():
+            try:
+                from .services.imap_monitor import process_imap_messages
+                result = process_imap_messages()
+                if result.get('processed', 0) > 0:
+                    app.logger.info("IMAP poll: %d processed, %d alerts, %d waiting human",
+                                   result.get('processed', 0), result.get('alerts', 0),
+                                   result.get('waiting_human', 0))
+            except Exception as exc:
+                app.logger.error("imap_poll failed: %s", exc)
+
 
 def _connector_factory(marketplace_record):
     from .connectors.ebay import EbayConnector
