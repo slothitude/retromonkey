@@ -1284,7 +1284,7 @@ def _aliexpress_oauth_url(args):
     ae = _get_aliexpress()
     if not ae.is_configured:
         raise RuntimeError("AliExpress API not configured (set ALIEXPRESS_APP_KEY and ALIEXPRESS_APP_SECRET)")
-    redirect_uri = args.get('redirect_uri', 'https://retromonkey.com.au/webhooks/aliexpress')
+    redirect_uri = args.get('redirect_uri', 'https://retromonkey.com.au/api/webhooks/aliexpress')
     state = str(int(time.time()))
     url = ae.get_auth_url(redirect_uri, state=state)
     return {

@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 # ── AliExpress OAuth ──
 
 @webhook_bp.route('/webhooks/aliexpress', methods=['GET'])
+@webhook_bp.route('/api/webhooks/aliexpress', methods=['GET'])
 def aliexpress_oauth_callback():
     """Handle AliExpress OAuth callback — exchange code for tokens.
 
@@ -37,7 +38,7 @@ def aliexpress_oauth_callback():
         ae = AliExpressConnector()
         redirect_uri = (
             f"{current_app.config.get('SITE_URL', 'https://retromonkey.com.au')}"
-            "/webhooks/aliexpress"
+            "/api/webhooks/aliexpress"
         )
         result = ae.exchange_code_for_token(code, redirect_uri)
 
