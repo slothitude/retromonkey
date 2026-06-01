@@ -68,6 +68,55 @@ def aliexpress_oauth_callback():
         return f"<h2>Token Exchange Failed</h2><p>{exc}</p>", 500
 
 
+@webhook_bp.route('/webhooks/alibaba', methods=['GET'])
+@webhook_bp.route('/api/webhooks/alibaba', methods=['GET'])
+def alibaba_oauth_callback():
+    """Handle Alibaba OAuth callback — exchange code for tokens."""
+    from flask import current_app
+
+    code = request.args.get('code', '')
+    error = request.args.get('error', '')
+    error_desc = request.args.get('error_description', '')
+
+    if error:
+        logger.error("Alibaba OAuth error: %s — %s", error, error_desc)
+        return f"<h2>Alibaba OAuth Failed</h2><p>{error}: {error_desc}</p>", 400
+
+    if not code:
+        return "<h2>No authorization code received</h2><p>The OAuth flow did not return a code.</p>", 400
+
+    logger.info("Alibaba OAuth callback received with code=%s...", code[:20])
+
+    try:
+        from retromonkey.services.alibaba import AlibabaConnector
+        conn = AlibabaConnector()
+        result = conn.exchange_code_for_token(code)
+
+        # Notify via Telegram
+        try:
+            from retromonkey.services.telegram_client import TelegramClient
+            tg = TelegramClient()
+            if tg.is_configured:
+                tg.send_message(
+                    f"<b>Alibaba OAuth Success</b>\n"
+                    f"Access token obtained.\n"
+                    f"Account: {result.get('account', 'N/A')}",
+                    parse_mode="HTML",
+                )
+        except Exception:
+            pass
+
+        return f"""
+        <h2>Alibaba OAuth Success!</h2>
+        <p>Access token saved. You can close this tab.</p>
+        <pre>{json.dumps(result, indent=2)}</pre>
+        """, 200
+
+    except Exception as exc:
+        logger.error("Alibaba OAuth token exchange failed: %s", exc)
+        return f"<h2>Token Exchange Failed</h2><p>{exc}</p>", 500
+
+
 @webhook_bp.route('/webhooks/ebay', methods=['POST'])
 def ebay_webhook():
     data = request.json

@@ -540,6 +540,65 @@ TOOLS = [
          'notes': {'type': 'string'}},
      'required': ['name']}},
 
+    # ---- Alibaba B2B ----
+    {'name': 'alibaba_search', 'description': 'Search Alibaba.com B2B wholesale for suppliers by keyword',
+     'inputSchema': {'type': 'object', 'properties': {
+         'keywords': {'type': 'string'},
+         'page_size': {'type': 'integer', 'default': 20}},
+     'required': ['keywords']}},
+
+    {'name': 'alibaba_list_products', 'description': 'List Alibaba products with filters (category, sort)',
+     'inputSchema': {'type': 'object', 'properties': {
+         'keywords': {'type': 'string'},
+         'category_id': {'type': 'string'},
+         'page_size': {'type': 'integer', 'default': 20},
+         'country': {'type': 'string', 'default': 'all'},
+         'sort': {'type': 'string', 'enum': ['relevance', 'price_asc', 'price_desc', 'newest']}}}},
+
+    {'name': 'alibaba_product_detail', 'description': 'Get product details from Alibaba by product ID',
+     'inputSchema': {'type': 'object', 'properties': {
+         'product_id': {'type': 'string'}},
+     'required': ['product_id']}},
+
+    {'name': 'alibaba_freight', 'description': 'Calculate freight/shipping cost for an Alibaba product',
+     'inputSchema': {'type': 'object', 'properties': {
+         'product_id': {'type': 'string'},
+         'country': {'type': 'string', 'default': 'AU'},
+         'quantity': {'type': 'integer', 'default': 1}},
+     'required': ['product_id']}},
+
+    {'name': 'alibaba_create_order', 'description': 'Create a BuyNow order on Alibaba',
+     'inputSchema': {'type': 'object', 'properties': {
+         'product_list': {'type': 'array', 'description': '[{productId, quantity, price, skuId}]'},
+         'logistics': {'type': 'object', 'description': 'Shipping address {fullName, phone, zipCode, state, city, addressLine1, country}'},
+         'channel_refer_id': {'type': 'string', 'description': 'Internal order ID for cross-referencing'},
+         'remark': {'type': 'string'}},
+     'required': ['product_list', 'logistics']}},
+
+    {'name': 'alibaba_order_get', 'description': 'Get Alibaba order details',
+     'inputSchema': {'type': 'object', 'properties': {
+         'order_id': {'type': 'string'}},
+     'required': ['order_id']}},
+
+    {'name': 'alibaba_order_list', 'description': 'List Alibaba orders',
+     'inputSchema': {'type': 'object', 'properties': {
+         'role': {'type': 'string', 'enum': ['buyer', 'seller'], 'default': 'buyer'},
+         'status': {'type': 'string'},
+         'page_size': {'type': 'integer', 'default': 20},
+         'start_page': {'type': 'integer', 'default': 0}}}},
+
+    {'name': 'alibaba_order_tracking', 'description': 'Track Alibaba order shipment logistics',
+     'inputSchema': {'type': 'object', 'properties': {
+         'trade_id': {'type': 'string'}},
+     'required': ['trade_id']}},
+
+    {'name': 'alibaba_oauth_url', 'description': 'Generate Alibaba OAuth authorization URL. Open in browser to authorize.',
+     'inputSchema': {'type': 'object', 'properties': {
+         'redirect_uri': {'type': 'string', 'description': 'Override redirect URI (defaults to production)'}}}},
+
+    {'name': 'alibaba_token_status', 'description': 'Check Alibaba OAuth token status (valid, expired, missing)',
+     'inputSchema': {'type': 'object', 'properties': {}}},
+
     # ---- Communications ----
     {'name': 'comms_inbox', 'description': 'Get unified inbox across all channels',
      'inputSchema': {'type': 'object', 'properties': {
@@ -878,6 +937,18 @@ HANDLERS = {
     'aliexpress_oauth_url': _ctx(lambda a: _aliexpress_oauth_url(a)),
     'aliexpress_token_status': _ctx(lambda a: _aliexpress_token_status(a)),
     'sourcing_add_manual': _ctx(lambda a: _sourcing_add_manual(a)),
+
+    # ---- Alibaba B2B ----
+    'alibaba_search': _ctx(lambda a: _alibaba_search(a)),
+    'alibaba_list_products': _ctx(lambda a: _alibaba_list_products(a)),
+    'alibaba_product_detail': _ctx(lambda a: _alibaba_product_detail(a)),
+    'alibaba_freight': _ctx(lambda a: _alibaba_freight(a)),
+    'alibaba_create_order': _ctx(lambda a: _alibaba_create_order(a)),
+    'alibaba_order_get': _ctx(lambda a: _alibaba_order_get(a)),
+    'alibaba_order_list': _ctx(lambda a: _alibaba_order_list(a)),
+    'alibaba_order_tracking': _ctx(lambda a: _alibaba_order_tracking(a)),
+    'alibaba_oauth_url': _ctx(lambda a: _alibaba_oauth_url(a)),
+    'alibaba_token_status': _ctx(lambda a: _alibaba_token_status(a)),
 
     # ---- Communications ----
     'comms_inbox': _ctx(lambda a: svc_comms().get_unified_inbox(a.get('filters'))),
@@ -1333,6 +1404,131 @@ def _sourcing_add_manual(args):
     db.session.add(supplier)
     db.session.commit()
     return {"id": supplier.id, "name": supplier.name, "created": True}
+
+
+# ---- Alibaba B2B handlers ----
+
+def _get_alibaba():
+    from retromonkey.services.alibaba import AlibabaConnector
+    return AlibabaConnector()
+
+
+def _alibaba_search(args):
+    conn = _get_alibaba()
+    if not conn.is_configured:
+        raise RuntimeError("Alibaba API not configured (set ALIBABA_APP_KEY and ALIBABA_APP_SECRET)")
+    return conn.search_products(args['keywords'], args.get('page_size', 20))
+
+
+def _alibaba_list_products(args):
+    conn = _get_alibaba()
+    if not conn.is_configured:
+        raise RuntimeError("Alibaba API not configured")
+    return conn.list_products(
+        keywords=args.get('keywords', ''),
+        category_id=args.get('category_id', ''),
+        page_size=args.get('page_size', 20),
+        country=args.get('country', 'all'),
+        sort=args.get('sort', 'relevance'),
+    )
+
+
+def _alibaba_product_detail(args):
+    conn = _get_alibaba()
+    if not conn.is_configured:
+        raise RuntimeError("Alibaba API not configured")
+    return conn.get_product_details(args['product_id'])
+
+
+def _alibaba_freight(args):
+    conn = _get_alibaba()
+    if not conn.is_configured:
+        raise RuntimeError("Alibaba API not configured")
+    return conn.calculate_freight(
+        args['product_id'],
+        country=args.get('country', 'AU'),
+        quantity=args.get('quantity', 1),
+    )
+
+
+def _alibaba_create_order(args):
+    conn = _get_alibaba()
+    if not conn.is_configured:
+        raise RuntimeError("Alibaba API not configured")
+    if not conn.has_valid_token:
+        raise RuntimeError("Alibaba access token expired or missing. Run alibaba_oauth_url to authorize.")
+    return conn.create_order(
+        product_list=args['product_list'],
+        logistics=args['logistics'],
+        channel_refer_id=args.get('channel_refer_id', ''),
+        remark=args.get('remark', ''),
+    )
+
+
+def _alibaba_order_get(args):
+    conn = _get_alibaba()
+    if not conn.is_configured:
+        raise RuntimeError("Alibaba API not configured")
+    return conn.get_order(args['order_id'])
+
+
+def _alibaba_order_list(args):
+    conn = _get_alibaba()
+    if not conn.is_configured:
+        raise RuntimeError("Alibaba API not configured")
+    return conn.list_orders(
+        role=args.get('role', 'buyer'),
+        status=args.get('status', ''),
+        page_size=args.get('page_size', 20),
+        start_page=args.get('start_page', 0),
+    )
+
+
+def _alibaba_order_tracking(args):
+    conn = _get_alibaba()
+    if not conn.is_configured:
+        raise RuntimeError("Alibaba API not configured")
+    return conn.track_order(args['trade_id'])
+
+
+def _alibaba_oauth_url(args):
+    import time
+    conn = _get_alibaba()
+    if not conn.is_configured:
+        raise RuntimeError("Alibaba API not configured (set ALIBABA_APP_KEY and ALIBABA_APP_SECRET)")
+    redirect_uri = args.get('redirect_uri', 'https://retromonkey.com.au/api/webhooks/alibaba')
+    url = conn.get_auth_url(redirect_uri)
+    return {
+        'auth_url': url,
+        'redirect_uri': redirect_uri,
+        'app_key': conn.app_key,
+        'instructions': 'Open this URL in a browser, log in with the Alibaba developer account, and approve access. The callback will save tokens automatically.',
+    }
+
+
+def _alibaba_token_status(args):
+    import time
+    conn = _get_alibaba()
+    configured = conn.is_configured
+    has_token = bool(conn.access_token)
+    is_valid = conn.has_valid_token
+    has_refresh = bool(conn.refresh_token)
+    expires_at = conn.token_expires_at
+
+    if not configured:
+        return {'status': 'not_configured', 'message': 'Missing ALIBABA_APP_KEY or ALIBABA_APP_SECRET'}
+    if not has_token:
+        return {'status': 'no_token', 'message': 'No access token. Run alibaba_oauth_url to start OAuth flow.'}
+    if not is_valid:
+        if has_refresh:
+            return {'status': 'expired_refreshable', 'message': 'Token expired but refresh_token available. API calls will auto-refresh.', 'expires_at': time.ctime(expires_at)}
+        return {'status': 'expired', 'message': 'Token expired and no refresh_token. Re-authorize via alibaba_oauth_url.', 'expires_at': time.ctime(expires_at)}
+    return {
+        'status': 'valid',
+        'message': 'Token valid and ready for API calls.',
+        'expires_at': time.ctime(expires_at),
+        'expires_in_seconds': int(expires_at - time.time()),
+    }
 
 
 def _ebay_update_price(args):
