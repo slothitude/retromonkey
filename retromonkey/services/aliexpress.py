@@ -18,7 +18,8 @@ import httpx
 logger = logging.getLogger(__name__)
 
 API_BASE = "https://api-sg.aliexpress.com/openapi"
-AUTH_BASE = "https://auth-sg.aliexpress.com/oauth/authorize"
+REST_BASE = "https://api-sg.aliexpress.com/rest"
+AUTH_BASE = "https://api-sg.aliexpress.com/oauth/authorize"
 
 # Token file path (Flask instance folder — same volume as DB)
 TOKENS_PATH = os.path.join(
@@ -88,27 +89,48 @@ class AliExpressConnector:
             'client_id': self.app_key,
             'redirect_uri': redirect_uri,
             'response_type': 'code',
+            'force_auth': 'true',
         }
         if state:
             params['state'] = state
         return f"{AUTH_BASE}?{urlencode(params)}"
 
     def exchange_code_for_token(self, code: str, redirect_uri: str) -> dict:
-        """Exchange authorization code for access/refresh tokens.
+        """Exchange authorization code for access/refresh tokens via REST API.
 
-        Returns token info dict and saves to disk.
+        Uses POST /rest/auth/token/create (not the old TOP API).
+        Response format: {gopResponseBody: "{json}", success: true}
         """
-        result = self._call('aliexpress.oauth.token.get', {
-            'code': code,
-            'redirect_uri': redirect_uri,
-        })
+        params = {
+            'app_key': self.app_key,
+            'timestamp': str(int(time.time() * 1000)),
+            'sign_method': 'sha256',
+        }
+        params['sign'] = self._sign(params)
 
-        # Token response format: aliexpress_oauth_token_get_response -> {access_token, refresh_token, ...}
-        token_data = result
+        resp = httpx.post(
+            f"{REST_BASE}/auth/token/create",
+            params={'code': code, **params},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+        # REST API response wraps body in gopResponseBody as JSON string
+        token_data = data
+        if data.get('gopResponseBody'):
+            try:
+                token_data = json.loads(data['gopResponseBody'])
+            except (json.JSONDecodeError, TypeError):
+                token_data = data
+
+        if data.get('gopErrorCode') and data['gopErrorCode'] != '0':
+            raise RuntimeError(f"AliExpress token error: {data}")
+
         self.access_token = token_data.get('access_token', '')
         self.refresh_token = token_data.get('refresh_token', '')
-        expires_in = int(token_data.get('expires_in', 28800))  # Default 8h
-        self.token_expires_at = int(time.time()) + expires_in - 300  # 5 min buffer
+        expires_in = int(token_data.get('expires_in', 86400))
+        self.token_expires_at = int(time.time()) + expires_in - 300
 
         self._save_tokens()
 
@@ -117,26 +139,44 @@ class AliExpressConnector:
             'refresh_token': self.refresh_token[:20] + '...' if self.refresh_token else '',
             'expires_in': expires_in,
             'user_nick': token_data.get('user_nick', ''),
+            'user_id': token_data.get('user_id', ''),
             'saved': True,
         }
 
     def refresh_access_token(self) -> bool:
-        """Refresh the access token using the refresh token. Returns True on success."""
+        """Refresh the access token using the refresh token via REST API. Returns True on success."""
         if not self.refresh_token:
             logger.warning("Cannot refresh AliExpress token: no refresh_token")
             return False
 
         try:
-            result = self._call('aliexpress.oauth.token.refresh', {
-                'refresh_token': self.refresh_token,
-            })
+            params = {
+                'app_key': self.app_key,
+                'timestamp': str(int(time.time() * 1000)),
+                'sign_method': 'sha256',
+            }
+            params['sign'] = self._sign(params)
 
-            token_data = result
+            resp = httpx.post(
+                f"{REST_BASE}/auth/token/refresh",
+                params={'refresh_token': self.refresh_token, **params},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+            token_data = data
+            if data.get('gopResponseBody'):
+                try:
+                    token_data = json.loads(data['gopResponseBody'])
+                except (json.JSONDecodeError, TypeError):
+                    token_data = data
+
             self.access_token = token_data.get('access_token', '')
             new_refresh = token_data.get('refresh_token', '')
             if new_refresh:
                 self.refresh_token = new_refresh
-            expires_in = int(token_data.get('expires_in', 28800))
+            expires_in = int(token_data.get('expires_in', 86400))
             self.token_expires_at = int(time.time()) + expires_in - 300
 
             self._save_tokens()
