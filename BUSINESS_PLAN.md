@@ -208,19 +208,94 @@ The edge isn't the market size — it's that **nobody else is doing local AU pro
 
 ---
 
+## Phase 1 Revised — Dominate AU Market (June 2026)
+
+### Goal: #1 retro handheld seller in Australia
+
+The AU market is only 5,000-10,000 units/year — small enough for one aggressive local seller to dominate. Every sale on eBay AU comes from Chinese sellers with 2-4 week shipping. We undercut on price AND crush on delivery speed.
+
+### Aggressive Pricing — Undercut Everyone
+
+| Product | Chinese Seller Price | Our Price | Our Edge |
+|---------|---------------------|-----------|----------|
+| Miyoo Mini Plus 64GB | $100-120 + 3wk | **$89.95 + 3 days** | Cheaper AND faster |
+| RG35XX H 64GB | $110-130 + 3wk | **$99.95 + 3 days** | Cheaper AND faster |
+| RG35XX Plus 64GB | $120-140 + 3wk | **$109.95 + local stock** | Faster |
+| RG35XX SP | $90-110 + 3wk | **$79.95 + 3 days** | Cheaper AND faster |
+| Miyoo Mini Plus 128GB | $130-150 + 3wk | **$119.95 + 3 days** | Cheaper AND faster |
+| Miyoo Mini Flip | $120-140 + 3wk | **$114.95 + 3 days** | Cheaper AND faster |
+| Trimui Brick | $140-160 + 3wk | **$139.95 + 3 days** | Cheaper AND faster |
+| Trimui Smart Pro 64GB | $140-170 + 3wk | **$159.95 + 3 days** | Faster |
+
+### Launch Inventory (10 units, $518 AUD) — Order Before June 30 FY Deadline
+
+| # | Product | Source | Unit Cost (AUD) | Qty | Subtotal | Sell Price | Margin/ea |
+|---|---------|--------|---------------|-----|---------|------------|-----------|
+| 1 | **RG28XX 64GB** | Official $35.03 | ~$54 | 1 | $54 | $79.95 | $26 |
+| 2-3 | **RG CubeXX 64GB** | AliExpress $41.94 (RHH8) | ~$64 | 2 | $128 | $99.95 | $36 |
+| 4-5 | **RG35XX H 64GB** | AliExpress $43.73 (RHH8) | ~$67 | 2 | $134 | $99.95 | $33 |
+| 6-7 | **RG35XX SP 64GB** | AliExpress $34.22 (RHH3) | ~$52 | 2 | $104 | $79.95 | $28 |
+| 8-9 | **Miyoo Mini Plus 64GB** | AliExpress $39.40 (RHH3) | ~$60 | 2 | $120 | $89.95 | $30 |
+| 10 | **RG35XX Plus 64GB** | Official $49.99 (AU stock!) | ~$77 | 1 | $77 | $109.95 | $33 |
+| | | | | | **$617** | | **$222 gross** |
+
+**Discount codes**: AliExpress `RHH3` ($3 off $15+), `RHH8` ($8 off $60+). Official Anbernic ships from AU (no import wait).
+
+**FY strategy**: Order before June 30 to claim stock expense in current financial year.
+
+### Expansion Catalog (add as sales compound)
+
+| Product | Source | Unit Cost (AUD) | Sell Price |
+|---------|--------|---------------|------------|
+| RG35XX 2024 (new revision) | Official $43.99 | ~$67 | $99.95 |
+| RG35XX Plus 64GB | Official $49.99 (AU stock!) | ~$77 | $109.95 |
+| Miyoo Mini Plus 128GB | AliExpress $50.89 (MIYOO7YEARS) | ~$78 | $119.95 |
+| Miyoo Mini Flip | AliExpress $48.40 (RHH8) | ~$74 | $114.95 |
+| Trimui Brick | AliExpress ~$60 | ~$92 | $139.95 |
+| Trimui Smart Pro 64GB | Official $69.99 (free AU ship) | ~$107 | $159.95 |
+
+### Summer Sale Window
+
+AliExpress Summer Sale runs **June 1-10, 2026**. Discount codes:
+- `RHH3` — $3 off $15+
+- `RHH8` — $8 off $60+
+- `RHH14` — $14 off $89+
+- Stack with PayPal savings and Rakuten 20% cashback for deeper discounts.
+
+### Expansion Catalog (add as sales compound)
+
+| Product | AliExpress Sale Price | AUD Cost | Sell Price |
+|---------|----------------------|----------|------------|
+| RG35XX Plus 64GB (ships from AU!) | $51.22 (official $49.99) | ~$77 | $109.95 |
+| Miyoo Mini Plus 128GB | $50.89 (code: MIYOO7YEARS) | ~$78 | $119.95 |
+| Miyoo Mini Flip | $48.40 (code: RHH8) | ~$74 | $114.95 |
+| Trimui Smart Pro 64GB | $77.22 (code: RHH14) / $69.99 official | ~$107 | $159.95 |
+
+### Scale Targets
+
+| Month | Units/week | Revenue/mo | Profit/mo |
+|-------|-----------|-----------|-----------|
+| 1 | 1-2 | $360-720 | $100-200 |
+| 2 | 2-4 | $720-1440 | $200-400 |
+| 3 | 5-10 | $1800-3600 | $500-1000 |
+| 6 | 10-15 | $3600-5400 | $1000-1500 |
+
+Year 1 revised target: 200-400 units, $20K-$40K revenue, $5K-$10K profit.
+
+---
+
 ## What NOT to Do (Yet)
 
 - Don't register for GST (until $75K)
 - Don't get RCM certification (until scale)
-- Don't buy bulk inventory
-- Don't pay for ads
+- Don't buy bulk inventory (use AliExpress buy-1-at-a-time until 5+/mo of a model)
+- Don't pay for ads (until consistent 5+/week)
 - Don't add Amazon/Kogan channels
-- Don't expand to 10+ products
 - Don't overthink it
 
 ## The Play
 
-**Ship 5 units. Learn. Reinvest. Repeat.**
+**Buy 10 units before June 30 (current FY). Mix of AliExpress Summer Sale (ends June 10) + Anbernic official (AU stock, no import wait). List all on eBay + retromonkey.com.au. Undercut every Chinese seller on price. Crush them on shipping. Sell one, buy two. Dominate AU.**
 
 ---
 
