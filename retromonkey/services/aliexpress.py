@@ -224,7 +224,8 @@ class AliExpressConnector:
 
         # Check for ISV error (both protocols)
         if data.get('type') == 'ISV':
-            raise RuntimeError(f"AliExpress API error [{data.get('code')}]: {data.get('message')}")
+            logger.error("AliExpress ISV error full response: %s", json.dumps(data, default=str))
+            raise RuntimeError(f"AliExpress API error [{data.get('code')}]: {data.get('message') or data.get('sub_msg', '')}")
 
         # Check GOP error code
         code = data.get('gopErrorCode', '0')
@@ -319,10 +320,15 @@ class AliExpressConnector:
         """
         data = self._top_call('aliexpress.ds.text.search', {
             'keywords': keywords,
+            'currency': target_currency,
             'target_currency': target_currency,
             'target_language': target_language,
+            'language': target_language,
+            'local': target_language,
             'ship_to_country': ship_to_country,
+            'countryCode': ship_to_country,
             'page_size': page_size,
+            'pageSize': page_size,
         }, require_token=True)
         data = self._parse_response(data, 'aliexpress.ds.text.search')
 

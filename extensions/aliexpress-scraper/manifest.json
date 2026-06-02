@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "RetroMonkey AliExpress Scraper",
+  "version": "1.0",
+  "description": "Extract product data from AliExpress search pages for RetroMonkey sourcing.",
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": ["https://www.aliexpress.com/*", "https://m.aliexpress.com/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.aliexpress.com/*", "https://m.aliexpress.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "48": "icon.png",
+    "128": "icon.png"
+  }
+}

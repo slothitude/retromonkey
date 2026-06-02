@@ -1,13 +1,6 @@
 # RetroMonkey TODO
 
-## URGENT — First Sale Fulfillment
-
-- [ ] **Mark first eBay order as shipped**
-  - Order: Anbernic RG35XX H, Buyer: Wade Sorensen, 260 Macquarie St, South Windsor NSW 2756
-  - AliExpress Order: 8211895963242932 (AU$86.76 via Coopreme Game Store)
-  - Waiting on AliExpress tracking number — est. delivery Jun 12
-  - Once tracking received: use `dropship_update_tracking` + `dropship_mark_shipped` MCP tools
-  - After delivery: request buyer review
+## URGENT
 
 - [ ] **Add bank details to eBay seller account**
   - Deadline: 28 Jun 2026 or selling account gets restricted
@@ -50,6 +43,13 @@
 - [ ] **Verify age on retromonkey.com.au Google account**
   - SafeSearch forced on, personalised ads off, Timeline off
 
+## Extensions
+
+- [ ] **Fix broken AliExpress scraper Chrome extension**
+  - State broken after content.js rewrite
+  - Extension in `extensions/aliexpress-scraper/`
+  - Debug on real AliExpress page, fix injection/popup/CDP workflow
+
 ## AliExpress API
 
 - [ ] **Complete AliExpress OAuth flow**
@@ -71,6 +71,7 @@
 
 ## Done
 
+- [x] **First eBay order shipped** — Anbernic RG35XX H to Wade Sorensen
 - [x] Fresh Gmail OAuth auth (1 Jun 2026)
 - [x] Processed 12 unread emails, labeled and categorized
 - [x] Created Gmail labels: RM-eBay-Action, RM-eBay-Routine

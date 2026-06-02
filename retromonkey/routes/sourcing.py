@@ -1,9 +1,21 @@
 """Sourcing API routes — research, suppliers, RFQ, reorder, quality, business plans."""
 
+import json
+import logging
+import os
+from datetime import datetime
+
 from flask import Blueprint, request, jsonify, current_app
 from retromonkey.app import db
 
+logger = logging.getLogger(__name__)
 sourcing_bp = Blueprint("sourcing", __name__)
+
+# Scratch file for scraped AliExpress data (JSON lines)
+AE_SCRAPE_PATH = os.path.join(
+    os.environ.get('FLASK_INSTANCE_PATH', os.path.join(os.path.dirname(__file__), '..', 'instance')),
+    'aliexpress_scrapes.jsonl'
+)
 
 
 # =====================================================================
@@ -319,3 +331,101 @@ def generate_business_plan():
     svc = BusinessPlannerService(db)
     result = svc.generate_plan(niche, float(budget))
     return jsonify(result)
+
+
+# =====================================================================
+# AliExpress Web Scraper Receiver
+# =====================================================================
+
+@sourcing_bp.route("/aliexpress-scrape", methods=["POST"])
+def receive_aliexpress_scrape():
+    """POST /api/sourcing/aliexpress-scrape — Receive scraped AliExpress data from Chrome extension.
+
+    Body: {"url": "...", "products": [...], "scraped_at": "..."}
+    Each product: {title, price, url, image, orders, shipping, store}
+    """
+    data = request.json or {}
+    products = data.get("products", [])
+    scrape_url = data.get("url", "")
+
+    if not products:
+        return jsonify({"error": "No products in scrape data"}), 400
+
+    saved = 0
+    for p in products:
+        if not p.get("title") and not p.get("url"):
+            continue
+        # Append to JSONL scratch file
+        _save_scrape_entry({
+            "scraped_at": data.get("scraped_at", datetime.utcnow().isoformat()),
+            "scrape_url": scrape_url,
+            **p,
+        })
+        saved += 1
+
+    logger.info("AliExpress scrape received: %d products from %s", saved, scrape_url)
+    return jsonify({"saved": saved, "total_stored": _count_scrape_entries()})
+
+
+@sourcing_bp.route("/aliexpress-scrape", methods=["GET"])
+def get_aliexpress_scrapes():
+    """GET /api/sourcing/aliexpress-scrape — Retrieve all scraped AliExpress data.
+
+    Query params:
+      - keyword: filter by title keyword
+      - limit: max entries (default 50)
+    """
+    keyword = request.args.get("keyword", "").lower()
+    limit = request.args.get("limit", 50, type=int)
+
+    entries = _read_scrape_entries()
+
+    if keyword:
+        entries = [e for e in entries if keyword in (e.get("title") or "").lower()]
+
+    return jsonify({"entries": entries[:limit], "total": len(entries)})
+
+
+@sourcing_bp.route("/aliexpress-scrape/clear", methods=["POST"])
+def clear_aliexpress_scrapes():
+    """POST /api/sourcing/aliexpress-scrape/clear — Delete all scraped data."""
+    try:
+        if os.path.exists(AE_SCRAPE_PATH):
+            os.remove(AE_SCRAPE_PATH)
+        return jsonify({"status": "cleared"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+def _save_scrape_entry(entry):
+    """Append one scrape entry to the JSONL file."""
+    os.makedirs(os.path.dirname(AE_SCRAPE_PATH), exist_ok=True)
+    with open(AE_SCRAPE_PATH, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def _read_scrape_entries():
+    """Read all scrape entries from JSONL file."""
+    entries = []
+    if not os.path.exists(AE_SCRAPE_PATH):
+        return entries
+    try:
+        with open(AE_SCRAPE_PATH, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    entries.append(json.loads(line))
+    except Exception as exc:
+        logger.warning("Failed to read scrape data: %s", exc)
+    return entries
+
+
+def _count_scrape_entries():
+    """Count lines in scrape file."""
+    if not os.path.exists(AE_SCRAPE_PATH):
+        return 0
+    count = 0
+    with open(AE_SCRAPE_PATH, encoding="utf-8") as f:
+        for _ in f:
+            count += 1
+    return count

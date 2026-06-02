@@ -382,6 +382,14 @@ TOOLS = [
          'depth': {'type': 'string', 'enum': ['quick', 'standard', 'deep'], 'default': 'standard'}},
          'required': ['niche']}},
 
+    {'name': 'ae_scrape_results', 'description': 'Get products scraped from AliExpress via Chrome extension. Navigate to AliExpress search in browser, use the RM Scraper extension, then call this to retrieve data.',
+     'inputSchema': {'type': 'object', 'properties': {
+         'keyword': {'type': 'string', 'description': 'Filter by title keyword'},
+         'limit': {'type': 'integer', 'default': 50}}},
+    },
+    {'name': 'ae_scrape_clear', 'description': 'Clear all scraped AliExpress data',
+     'inputSchema': {'type': 'object', 'properties': {}}},
+
     # ---- RFQ ----
     {'name': 'rfq_generate', 'description': 'Generate an RFQ for a product',
      'inputSchema': {'type': 'object', 'properties': {
@@ -876,6 +884,10 @@ HANDLERS = {
 
     'sourcing_research_niche': _ctx(lambda a: svc_research().research_niche(
         a['niche'], a.get('depth', 'standard'))),
+
+    'ae_scrape_results': _ctx(lambda a: _ae_scrape_get(
+        a.get('keyword', ''), a.get('limit', 50))),
+    'ae_scrape_clear': _ctx(lambda a: _ae_scrape_clear()),
 
     # ---- RFQ ----
     'rfq_generate': _ctx(lambda a: svc_rfq().generate_rfq(
@@ -1404,6 +1416,36 @@ def _sourcing_add_manual(args):
     db.session.add(supplier)
     db.session.commit()
     return {"id": supplier.id, "name": supplier.name, "created": True}
+
+
+# ---- AliExpress scrape handlers ----
+
+def _ae_scrape_get(keyword='', limit=50):
+    """Retrieve scraped AliExpress data from the JSONL scratch file."""
+    import json, os
+    from retromonkey.routes.sourcing import AE_SCRAPE_PATH
+    entries = []
+    if os.path.exists(AE_SCRAPE_PATH):
+        with open(AE_SCRAPE_PATH, encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        entries.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        pass
+    if keyword:
+        entries = [e for e in entries if keyword.lower() in (e.get('title') or '').lower()]
+    return {"entries": entries[:limit], "total": len(entries)}
+
+
+def _ae_scrape_clear():
+    """Clear all scraped AliExpress data."""
+    import os
+    from retromonkey.routes.sourcing import AE_SCRAPE_PATH
+    if os.path.exists(AE_SCRAPE_PATH):
+        os.remove(AE_SCRAPE_PATH)
+    return {"status": "cleared"}
 
 
 # ---- Alibaba B2B handlers ----
