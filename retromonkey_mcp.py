@@ -191,7 +191,7 @@ def _ctx(func):
 
 
 # ===========================================================================
-# TOOL DEFINITIONS — 76 tools across 21 domains
+# TOOL DEFINITIONS — 98 tools across 21 domains
 # ===========================================================================
 TOOLS = [
     # ---- Health ----
@@ -536,6 +536,29 @@ TOOLS = [
 
     {'name': 'aliexpress_token_status', 'description': 'Check AliExpress OAuth token status (valid, expired, missing)',
      'inputSchema': {'type': 'object', 'properties': {}}},
+
+    {'name': 'aliexpress_affiliate_search', 'description': 'Search AliExpress via Affiliate API (no OAuth needed). Use this for product discovery.',
+     'inputSchema': {'type': 'object', 'properties': {
+         'keywords': {'type': 'string'},
+         'page_size': {'type': 'integer', 'default': 20},
+         'category_ids': {'type': 'string', 'description': 'Comma-separated category IDs'},
+         'min_price': {'type': 'number', 'description': 'Min price in USD'},
+         'max_price': {'type': 'number', 'description': 'Max price in USD'},
+         'ship_to_country': {'type': 'string', 'default': 'AU'}},
+     'required': ['keywords']}},
+
+    {'name': 'aliexpress_affiliate_detail', 'description': 'Get AliExpress product details via Affiliate API (no OAuth needed)',
+     'inputSchema': {'type': 'object', 'properties': {
+         'product_id': {'type': 'string'},
+         'ship_to_country': {'type': 'string', 'default': 'AU'}},
+     'required': ['product_id']}},
+
+    {'name': 'aliexpress_hot_products', 'description': 'Get top-selling AliExpress products via Affiliate API',
+     'inputSchema': {'type': 'object', 'properties': {
+         'category_ids': {'type': 'string', 'description': 'Comma-separated category IDs'},
+         'count': {'type': 'integer', 'default': 20}},
+     'required': []}},
+
 
     {'name': 'sourcing_add_manual', 'description': 'Manually add a supplier entry (workaround for broken Alibaba scraper)',
      'inputSchema': {'type': 'object', 'properties': {
@@ -948,6 +971,9 @@ HANDLERS = {
     'aliexpress_order_tracking': _ctx(lambda a: _aliexpress_order_tracking(a)),
     'aliexpress_oauth_url': _ctx(lambda a: _aliexpress_oauth_url(a)),
     'aliexpress_token_status': _ctx(lambda a: _aliexpress_token_status(a)),
+    'aliexpress_affiliate_search': _ctx(lambda a: _aliexpress_affiliate_search(a)),
+    'aliexpress_affiliate_detail': _ctx(lambda a: _aliexpress_affiliate_detail(a)),
+    'aliexpress_hot_products': _ctx(lambda a: _aliexpress_hot_products(a)),
     'sourcing_add_manual': _ctx(lambda a: _sourcing_add_manual(a)),
 
     # ---- Alibaba B2B ----
@@ -1386,21 +1412,53 @@ def _aliexpress_token_status(args):
     is_valid = ae.has_valid_token
     has_refresh = bool(ae.refresh_token)
     expires_at = ae.token_expires_at
+    has_aff = ae.has_affiliate_keys
 
     if not configured:
         return {'status': 'not_configured', 'message': 'Missing ALIEXPRESS_APP_KEY or ALIEXPRESS_APP_SECRET'}
     if not has_token:
-        return {'status': 'no_token', 'message': 'No access token. Run aliexpress_oauth_url to start OAuth flow.'}
+        aff_msg = ' Affiliate API available for search.' if has_aff else ''
+        return {'status': 'no_token', 'message': 'No access token for DS endpoints.' + aff_msg, 'affiliate_available': has_aff}
     if not is_valid:
         if has_refresh:
-            return {'status': 'expired_refreshable', 'message': 'Token expired but refresh_token available. API calls will auto-refresh.', 'expires_at': time.ctime(expires_at)}
-        return {'status': 'expired', 'message': 'Token expired and no refresh_token. Re-authorize via aliexpress_oauth_url.', 'expires_at': time.ctime(expires_at)}
+            return {'status': 'expired_refreshable', 'message': 'Token expired but refresh_token available. API calls will auto-refresh.', 'expires_at': time.ctime(expires_at), 'affiliate_available': has_aff}
+        return {'status': 'expired', 'message': 'Token expired and no refresh_token. Re-authorize via aliexpress_oauth_url.', 'expires_at': time.ctime(expires_at), 'affiliate_available': has_aff}
     return {
         'status': 'valid',
         'message': 'Token valid and ready for API calls.',
         'expires_at': time.ctime(expires_at),
         'expires_in_seconds': int(expires_at - time.time()),
+        'affiliate_available': has_aff,
     }
+
+
+def _aliexpress_affiliate_search(args):
+    ae = _get_aliexpress()
+    return ae.search_products_affiliate(
+        keywords=args['keywords'],
+        page_size=args.get('page_size', 20),
+        category_ids=args.get('category_ids', ''),
+        currency=args.get('currency', 'USD'),
+        ship_to_country=args.get('ship_to_country', 'AU'),
+        min_sale_price=args.get('min_price'),
+        max_sale_price=args.get('max_price'),
+    )
+
+
+def _aliexpress_affiliate_detail(args):
+    ae = _get_aliexpress()
+    return ae.get_product_detail_affiliate(
+        product_id=args['product_id'],
+        ship_to_country=args.get('ship_to_country', 'AU'),
+    )
+
+
+def _aliexpress_hot_products(args):
+    ae = _get_aliexpress()
+    return ae.get_hot_products(
+        category_ids=args.get('category_ids', ''),
+        count=args.get('count', 20),
+    )
 
 
 def _sourcing_add_manual(args):

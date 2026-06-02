@@ -52,16 +52,59 @@
 
 ## AliExpress API
 
-- [ ] **Complete AliExpress OAuth flow**
-  - AppKey: 535696, Status: Test
-  - Need to get access_token via OAuth (currently empty)
-  - Without access_token, order creation and tracking won't work
-  - Developer portal: openservice.aliexpress.com
+### Current Implementation — Blocked
 
-- [ ] **Update AliExpress connector to match real API spec**
-  - Plan doc shows new REST endpoints (`/rest`) vs old TOP (`/openapi`)
-  - `createOrder` uses different param structure than what we implemented
-  - Affirmative product query uses `aliexpress.affiliate.product.query` not `dropship.product.search`
+- [x] **Add Affiliate API to connector** (3 Jun 2026)
+  - Added `_affiliate_call()`, `search_products_affiliate()`, `get_product_detail_affiliate()`, `get_hot_products()`
+  - Added 3 MCP tools: `aliexpress_affiliate_search`, `aliexpress_affiliate_detail`, `aliexpress_hot_products`
+  - `search_products()` and `get_product_details()` now try affiliate first, fall back to DS
+  - Gateway: `http://gw.api.taobao.com/router/rest` (https times out)
+  - Signing: MD5 bookend (secret+params+secret), no OAuth needed
+
+- [ ] **Create Affiliate API app in developer console**
+  - Go to openservice.aliexpress.com console
+  - Create new app → select **"Affiliates API"** type (NOT Dropshipping)
+  - Standard Publisher API is auto-granted — no extra approval needed
+  - Copy App Key + App Secret
+  - Set as `ALIEXPRESS_AFF_APP_KEY` and `ALIEXPRESS_AFF_APP_SECRET` in .env
+  - Test with MCP tool `aliexpress_affiliate_search` keyword "RG35XX"
+  - NOTE: Current DS app key (535696) does NOT work — returned `isv.appkey-not-exists`
+
+### API Groups (researched 3 Jun 2026)
+
+**1) AliExpress DS API (current — blocked):**
+- Endpoints: `aliexpress.ds.text.search`, `aliexpress.ds.order.create`, etc.
+- Requires: Dropshipping Center enrollment → DS API package grant → OAuth session token
+- Our app (535696) is NOT approved for this package
+- All `aliexpress.ds.*` calls fail with `EXCEPTION_TEXT_SEARCH_FOR_DS`
+
+**2) AliExpress Affiliate API (easier alternative for product search):**
+- `aliexpress.affiliate.product.query` — product catalog search
+- `aliexpress.affiliate.productdetail.query` — product details
+- Easier to obtain than DS permissions — several developers report this works when DS approval is denied
+- Does NOT support order creation — search/details only
+
+**3) AliExpress Dropshipping Center web portal (manual fallback):**
+- ds.aliexpress.com — product sourcing, quick orders, order sync, profit tracking
+- Already enrolled (user `ae935127`)
+- Works in browser, no API access needed
+
+### Alibaba ICBU-DropShipping API (not yet implemented)
+
+- API group: `ICBU-DropShipping` on Alibaba Open Platform (openapi.alibaba.com)
+- Key endpoints:
+  - `alibaba.dropshipping.product.get` — product info
+  - `alibaba.dropshipping.token.create` — product selection token
+  - `alibaba.buynow.order.create` — create buyer order
+  - `alibaba.order.freight.calculate` — freight calc
+  - `alibaba.shipping.freight.calculate` — shipping calc
+  - `alibaba.order.logistics.tracking.get` — tracking
+  - `alibaba.order.pay.result.query` — payment status
+  - `alibaba.dropshipping.order.pay` — DS payment
+  - `alibaba.dropshipping.store.save` — store integration
+- Current Alibaba connector uses `/eco/buyer/product/search` (general buyer APIs), not DS-specific
+- Community reports difficulty getting production approval for ICBU-DropShipping
+- Anti-bot: Alibaba search has slider CAPTCHA, blocks automated access
 
 ## Re-listing (after infrastructure solid)
 

@@ -1,15 +1,21 @@
-"""AliExpress Dropshipping API connector — product search, order creation, tracking.
+"""AliExpress API connector — affiliate search, dropshipping orders, tracking.
 
-Uses the AliExpress IOP SDK (Java SDK) with TWO protocols:
-  - GOP protocol: POST /rest/{apiName} — for auth/token endpoints
-      - apiName has leading slash (e.g., /auth/token/create)
-      - Sign string = apiName + sorted(key+value)
-  - TOP protocol: POST /sync?method={apiName} — for business DS endpoints
-      - apiName has NO leading slash (e.g., aliexpress.ds.order.tracking.get)
-      - Sign string = sorted(key+value) (no apiName prefix)
-      - Common params include: app_key, v, timestamp, method, format, session, sign, sign_method
+Three API protocols:
 
-Signing (both): HMAC-SHA256(key=app_secret, message=sign_string) → uppercase hex
+  1. Affiliate API (product search/details — no OAuth needed):
+     - Gateway: gw.api.taobao.com/router/rest
+     - Signing: MD5 bookend — MD5(secret + sorted(key+value) + secret).upper()
+     - Timestamp: YYYY-MM-DD HH:mm:ss (Asia/Shanghai)
+     - Endpoints: aliexpress.affiliate.product.query, .productdetail.get, .hotproduct.query
+
+  2. GOP protocol: POST /rest/{apiName} — for auth/token endpoints
+     - Sign string = apiName + sorted(key+value)
+     - Signing: HMAC-SHA256
+
+  3. TOP protocol: POST /sync?method={apiName} — for DS business endpoints
+     - Sign string = sorted(key+value) (no apiName prefix)
+     - Signing: HMAC-SHA256
+     - NOTE: aliexpress.ds.* endpoints require DS API approval — currently BLOCKED
 
 AppKey: 535696
 Env vars: ALIEXPRESS_APP_KEY, ALIEXPRESS_APP_SECRET, ALIEXPRESS_ACCESS_TOKEN
@@ -22,6 +28,7 @@ import json
 import logging
 import os
 import time
+from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
 
 import httpx
@@ -60,6 +67,12 @@ class AliExpressConnector:
         """True if we have an unexpired access token."""
         return bool(self.access_token and time.time() < self.token_expires_at)
 
+    @property
+    def has_affiliate_keys(self) -> bool:
+        """True if affiliate app_key/secret are set (may differ from DS app)."""
+        return bool(os.environ.get('ALIEXPRESS_AFF_APP_KEY', '') and
+                     os.environ.get('ALIEXPRESS_AFF_APP_SECRET', ''))
+
     # ── Token persistence ──
 
     def _load_tokens(self):
@@ -90,6 +103,192 @@ class AliExpressConnector:
             logger.info("AliExpress tokens saved to %s", TOKENS_PATH)
         except Exception as exc:
             logger.error("Failed to save AliExpress tokens: %s", exc)
+
+    # ── Affiliate API (Taobao gateway, MD5 signing, no OAuth) ──
+
+    AFFILIATE_GATEWAY = "http://gw.api.taobao.com/router/rest"
+
+    def _get_affiliate_credentials(self):
+        """Return (app_key, app_secret) for affiliate API.
+
+        Uses ALIEXPRESS_AFF_APP_KEY/SECRET if set, otherwise falls back
+        to the DS app credentials (same keys may work for both).
+        """
+        key = os.environ.get('ALIEXPRESS_AFF_APP_KEY', '') or self.app_key
+        secret = os.environ.get('ALIEXPRESS_AFF_APP_SECRET', '') or self.app_secret
+        return key, secret
+
+    def _affiliate_sign(self, app_secret: str, params: dict) -> str:
+        """MD5 bookend signing: MD5(secret + concat(sorted key+value) + secret).upper()"""
+        sorted_pairs = sorted(params.items())
+        sign_str = ''.join(f'{k}{v}' for k, v in sorted_pairs)
+        bookend = f'{app_secret}{sign_str}{app_secret}'
+        return hashlib.md5(bookend.encode()).hexdigest().upper()
+
+    def _affiliate_call(self, method: str, biz_params: dict = None) -> dict:
+        """Call AliExpress Affiliate API via Taobao gateway.
+
+        Signing: MD5 bookend (secret + params + secret)
+        Timestamp: YYYY-MM-DD HH:mm:ss (Asia/Shanghai)
+        No access token required.
+        """
+        aff_key, aff_secret = self._get_affiliate_credentials()
+        if not aff_key or not aff_secret:
+            raise RuntimeError("AliExpress Affiliate API not configured (set ALIEXPRESS_APP_KEY + ALIEXPRESS_APP_SECRET, or ALIEXPRESS_AFF_APP_KEY + ALIEXPRESS_AFF_APP_SECRET)")
+
+        # Shanghai timezone timestamp
+        shanghai_tz = timezone(timedelta(hours=8))
+        timestamp = datetime.now(shanghai_tz).strftime('%Y-%m-%d %H:%M:%S')
+
+        params = {
+            'method': method,
+            'app_key': aff_key,
+            'timestamp': timestamp,
+            'sign_method': 'md5',
+            'format': 'json',
+            'v': '2.0',
+        }
+        if biz_params:
+            params.update(biz_params)
+
+        params['sign'] = self._affiliate_sign(aff_secret, params)
+
+        resp = httpx.post(
+            self.AFFILIATE_GATEWAY,
+            data=urlencode(params),
+            headers={'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+        # Check for Taobao error response
+        error = data.get('error_response')
+        if error:
+            raise RuntimeError(f"AliExpress Affiliate API error [{error.get('code')}]: {error.get('msg', '')} — {error.get('sub_msg', '')}")
+
+        # Unwrap TOP response: {method_with_dots_replaced_response: {...}}
+        response_key = method.replace('.', '_') + '_response'
+        if response_key in data:
+            inner = data[response_key]
+            # Check for resp_code inside
+            resp_code = inner.get('resp_code', inner.get('code', ''))
+            resp_msg = inner.get('resp_msg', inner.get('msg', ''))
+            if resp_code and resp_code not in (200, '200', '0'):
+                raise RuntimeError(f"AliExpress Affiliate API error [{resp_code}]: {resp_msg}")
+            return inner
+
+        return data
+
+    def search_products_affiliate(self, keywords: str, page_size: int = 20,
+                                   category_ids: str = '', currency: str = 'USD',
+                                   language: str = 'EN',
+                                   min_sale_price: float = None,
+                                   max_sale_price: float = None,
+                                   ship_to_country: str = 'AU') -> list[dict]:
+        """Search products via AliExpress Affiliate API.
+
+        API: aliexpress.affiliate.product.query
+        No OAuth token needed — uses app_key signing only.
+        """
+        params = {
+            'keywords': keywords,
+            'target_currency': currency,
+            'target_language': language,
+            'ship_to_country': ship_to_country,
+            'page_size': min(page_size, 50),
+        }
+        if category_ids:
+            params['category_ids'] = category_ids
+        if min_sale_price is not None:
+            params['min_sale_price'] = str(int(min_sale_price * 100))  # cents
+        if max_sale_price is not None:
+            params['max_sale_price'] = str(int(max_sale_price * 100))  # cents
+
+        data = self._affiliate_call('aliexpress.affiliate.product.query', params)
+
+        products = data.get('result', {}).get('products', data.get('products', []))
+        return [
+            {
+                'id': p.get('product_id'),
+                'title': p.get('product_title', p.get('subject', '')),
+                'price': float(p.get('target_sale_price', p.get('sale_price', 0))) / 100,  # cents to dollars
+                'original_price': float(p.get('target_original_price', p.get('original_price', 0))) / 100,
+                'image_url': p.get('product_main_image_url', p.get('image_url', '')),
+                'product_url': p.get('product_detail_url', p.get('promotion_link', '')),
+                'shop_url': p.get('shop_url', ''),
+                'shop_name': p.get('shop_name', ''),
+                'rating': float(p.get('evaluate_rate', p.get('feedback_rating', 0))),
+                'orders': int(p.get('second_level_category_id', 0)),  # not always available
+                'commission_rate': float(p.get('commission_rate', 0)),
+            }
+            for p in products
+        ]
+
+    def get_product_detail_affiliate(self, product_id: str,
+                                      currency: str = 'USD',
+                                      language: str = 'EN',
+                                      ship_to_country: str = 'AU') -> dict:
+        """Get product details via AliExpress Affiliate API.
+
+        API: aliexpress.affiliate.productdetail.get
+        No OAuth token needed — uses app_key signing only.
+        """
+        data = self._affiliate_call('aliexpress.affiliate.productdetail.get', {
+            'product_ids': str(product_id),
+            'target_currency': currency,
+            'target_language': language,
+            'ship_to_country': ship_to_country,
+            'fields': 'commission_rate,sale_price,original_price,product_title,product_main_image_url,product_detail_url,shop_url,shop_name,evaluate_rate,second_level_category_id',
+        })
+
+        products = data.get('resp_result', {}).get('result', {}).get('products', {})
+        product = products.get('product', {})
+        if not product:
+            # Try alternate response structure
+            products_list = data.get('result', {}).get('products', [])
+            product = products_list[0] if products_list else {}
+
+        return {
+            'id': product.get('product_id', product_id),
+            'title': product.get('product_title', ''),
+            'price': float(product.get('target_sale_price', product.get('sale_price', 0))) / 100,
+            'original_price': float(product.get('target_original_price', product.get('original_price', 0))) / 100,
+            'image_url': product.get('product_main_image_url', ''),
+            'product_url': product.get('product_detail_url', ''),
+            'shop_url': product.get('shop_url', ''),
+            'shop_name': product.get('shop_name', ''),
+            'rating': float(product.get('evaluate_rate', 0)),
+            'commission_rate': float(product.get('commission_rate', 0)),
+        }
+
+    def get_hot_products(self, category_ids: str = '', count: int = 20,
+                         currency: str = 'USD', language: str = 'EN') -> list[dict]:
+        """Get top-selling products via AliExpress Affiliate API.
+
+        API: aliexpress.affiliate.hotproduct.query
+        """
+        params = {
+            'target_currency': currency,
+            'target_language': language,
+            'count': min(count, 50),
+        }
+        if category_ids:
+            params['category_ids'] = category_ids
+
+        data = self._affiliate_call('aliexpress.affiliate.hotproduct.query', params)
+        products = data.get('resp_result', {}).get('result', {}).get('products', {})
+        return [
+            {
+                'id': p.get('product_id'),
+                'title': p.get('product_title', ''),
+                'price': float(p.get('target_sale_price', 0)) / 100,
+                'original_price': float(p.get('target_original_price', 0)) / 100,
+                'image_url': p.get('product_main_image_url', ''),
+                'product_url': p.get('product_detail_url', ''),
+            }
+            for p in products.get('product', [])
+        ]
 
     # ── OAuth ──
 
@@ -314,10 +513,25 @@ class AliExpressConnector:
                          target_currency: str = 'USD',
                          target_language: str = 'en',
                          ship_to_country: str = 'AU') -> list[dict]:
-        """Search for products on AliExpress dropshipping catalog.
+        """Search for products on AliExpress.
 
-        API: aliexpress.ds.text.search
+        Tries Affiliate API first (no OAuth needed), falls back to DS API.
         """
+        # Try affiliate API first — no token needed, wider availability
+        try:
+            aff_key, _ = self._get_affiliate_credentials()
+            if aff_key:
+                return self.search_products_affiliate(
+                    keywords=keywords,
+                    page_size=page_size,
+                    currency=target_currency,
+                    language=target_language.upper(),
+                    ship_to_country=ship_to_country,
+                )
+        except Exception as exc:
+            logger.warning("Affiliate search failed, falling back to DS: %s", exc)
+
+        # Fallback: DS API (blocked without approval)
         data = self._top_call('aliexpress.ds.text.search', {
             'keywords': keywords,
             'currency': target_currency,
@@ -353,10 +567,24 @@ class AliExpressConnector:
                             ship_to_country: str = 'AU',
                             target_currency: str = 'USD',
                             target_language: str = 'en') -> dict:
-        """Get detailed product info from dropshipping catalog.
+        """Get detailed product info.
 
-        API: aliexpress.ds.product.get
+        Tries Affiliate API first (no OAuth needed), falls back to DS API.
         """
+        # Try affiliate API first
+        try:
+            aff_key, _ = self._get_affiliate_credentials()
+            if aff_key:
+                return self.get_product_detail_affiliate(
+                    product_id=product_id,
+                    currency=target_currency,
+                    language=target_language.upper(),
+                    ship_to_country=ship_to_country,
+                )
+        except Exception as exc:
+            logger.warning("Affiliate detail failed, falling back to DS: %s", exc)
+
+        # Fallback: DS API (blocked without approval)
         data = self._top_call('aliexpress.ds.product.get', {
             'product_id': product_id,
             'ship_to_country': ship_to_country,
