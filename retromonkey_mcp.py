@@ -1412,23 +1412,23 @@ def _aliexpress_token_status(args):
     is_valid = ae.has_valid_token
     has_refresh = bool(ae.refresh_token)
     expires_at = ae.token_expires_at
-    has_aff = ae.has_affiliate_keys
+    sdk_available = ae.sdk_available
 
     if not configured:
-        return {'status': 'not_configured', 'message': 'Missing ALIEXPRESS_APP_KEY or ALIEXPRESS_APP_SECRET'}
+        return {'status': 'not_configured', 'message': 'Missing ALIEXPRESS_APP_KEY or ALIEXPRESS_APP_SECRET', 'sdk_available': sdk_available}
     if not has_token:
-        aff_msg = ' Affiliate API available for search.' if has_aff else ''
-        return {'status': 'no_token', 'message': 'No access token for DS endpoints.' + aff_msg, 'affiliate_available': has_aff}
+        aff_msg = ' Affiliate API (search) available via SDK.' if sdk_available else ' SDK jar not found or Java missing.'
+        return {'status': 'no_token', 'message': 'No access token for DS endpoints.' + aff_msg, 'sdk_available': sdk_available}
     if not is_valid:
         if has_refresh:
-            return {'status': 'expired_refreshable', 'message': 'Token expired but refresh_token available. API calls will auto-refresh.', 'expires_at': time.ctime(expires_at), 'affiliate_available': has_aff}
-        return {'status': 'expired', 'message': 'Token expired and no refresh_token. Re-authorize via aliexpress_oauth_url.', 'expires_at': time.ctime(expires_at), 'affiliate_available': has_aff}
+            return {'status': 'expired_refreshable', 'message': 'Token expired but refresh_token available. API calls will auto-refresh.', 'expires_at': time.ctime(expires_at), 'sdk_available': sdk_available}
+        return {'status': 'expired', 'message': 'Token expired and no refresh_token. Re-authorize via aliexpress_oauth_url.', 'expires_at': time.ctime(expires_at), 'sdk_available': sdk_available}
     return {
         'status': 'valid',
         'message': 'Token valid and ready for API calls.',
         'expires_at': time.ctime(expires_at),
         'expires_in_seconds': int(expires_at - time.time()),
-        'affiliate_available': has_aff,
+        'sdk_available': sdk_available,
     }
 
 
