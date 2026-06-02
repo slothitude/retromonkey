@@ -151,9 +151,42 @@ Target: **8 products** total. Don't overextend — stay focused on what sells.
 
 ### Shipping
 
-- **Australia Post tracked**: $8-12 per parcel (customer pays via shipping fee)
-- **Free shipping on orders >$100** (absorbed into product margin)
-- **Dispatch within 24 hours** — this is the competitive advantage
+**Pricing sourced from AusPost retail update 28 May 2026 (effective 1 Jul 2026, ~4.95% increase).**
+
+All retro handhelds (~15x8x2cm, 170-200g) fit in **Extra Small prepaid satchel** (215x280mm).
+
+| Satchel Size | Single | Pack of 10 (per unit) | MyPost Business Band 5 |
+|-------------|--------|----------------------|----------------------|
+| Extra Small | $10.55 | $10.00 | **~$5.82** |
+| Small | $12.05 | $11.45 | ~$7.00 |
+| Medium | $16.40 | $15.58 | ~$9.84 |
+
+**MyPost Business** (free signup, eBay integration built in):
+- Savings bands based on weekly spend (postage + packaging + pickups all count)
+- Band 0: retail rate | Band 1 ($50+/wk): ~10% off | Band 5 ($1000+/wk): up to 40% off
+- At 10+ units/week, shipping drops to ~$8/unit — customer pays $9.95, we profit $2
+
+**Shipping cost per order by volume:**
+
+| Volume | AusPost Cost (bulk) | Customer Pays | RM Absorbs/Profits |
+|--------|---------------------|---------------|-------------------|
+| 1-4/week (Band 0) | $10.00 | $9.95 | -$0.05 |
+| 5-9/week (Band 1) | ~$9.00 | $9.95 | Free |
+| 10-15/week (Band 2) | ~$8.50 | $9.95 | +$1.45 profit |
+| 50+/week (Band 4) | ~$7.91 | $9.95 | +$2.04 profit |
+
+**Customer-facing policy:**
+- Flat rate **$9.95 tracked shipping** on all orders
+- **Free shipping on orders >$100** (absorbed into margin)
+- **Dispatch within 24 hours** — the competitive advantage
+- Use bulk Extra Small prepaid satchels (packs of 10, $10.00 each)
+- Express Post available at checkout for $14.95 (covers Small satchel cost)
+
+**Setup:**
+1. Sign up for MyPost Business (free) → connect eBay account
+2. Buy Extra Small prepaid satchels in bulk packs of 10
+3. At low volume (1-4/week), stay at retail MyPost rates
+4. Savings bands scale automatically as volume grows — no action needed
 
 ### Sourcing Tiers
 
@@ -216,16 +249,24 @@ The AU market is only 5,000-10,000 units/year — small enough for one aggressiv
 
 ### Aggressive Pricing — Undercut Everyone
 
-| Product | Chinese Seller Price | Our Price | Our Edge |
-|---------|---------------------|-----------|----------|
-| Miyoo Mini Plus 64GB | $100-120 + 3wk | **$89.95 + 3 days** | Cheaper AND faster |
-| RG35XX H 64GB | $110-130 + 3wk | **$99.95 + 3 days** | Cheaper AND faster |
-| RG35XX Plus 64GB | $120-140 + 3wk | **$109.95 + local stock** | Faster |
-| RG35XX SP | $90-110 + 3wk | **$79.95 + 3 days** | Cheaper AND faster |
-| Miyoo Mini Plus 128GB | $130-150 + 3wk | **$119.95 + 3 days** | Cheaper AND faster |
-| Miyoo Mini Flip | $120-140 + 3wk | **$114.95 + 3 days** | Cheaper AND faster |
-| Trimui Brick | $140-160 + 3wk | **$139.95 + 3 days** | Cheaper AND faster |
-| Trimui Smart Pro 64GB | $140-170 + 3wk | **$159.95 + 3 days** | Faster |
+Live eBay pricing scraped 2 Jun 2026 (~100 listings, USD converted to AUD at 1.55).
+Key competitor: **dalbani_global** (10+ color variants per model, ships from China 2-4 wk).
+Zero AU-local sellers found on eBay. All sellers are US/China-based.
+
+| Product | eBay Global Range (AUD) | eBay Lowest New (AUD) | Our Price | Our Edge |
+|---------|------------------------|----------------------|-----------|----------|
+| RG28XX 64GB | $78-93 | $78 (anbernic-usa $50 USD) | **$79.95** | Slight premium for local |
+| RG CubeXX 64GB | $93-124 | $93 (anbernic-usa) | **$99.95** | Competitive, local stock |
+| RG35XX H 64GB | $108-139 | $108 (anbernic-usa $74.99) | **$99.95** | **Cheaper** AND faster |
+| RG35XX Plus 64GB | $96-124 | $96 (anbernic-usa $61.99) | **$109.95** | Competitive, local stock |
+| RG35XX SP 64GB | $101-139 | $101 (dalbani $84.95) | **$79.95** | **Much cheaper** AND faster |
+| Miyoo Mini Plus 64GB | $93-132 | $93 (ampown $64.89) | **$89.95** | **Cheaper** AND faster |
+| Miyoo Mini Plus 128GB | $139-188 | $139 (ampown) | **$119.95** | **Cheaper** AND faster |
+| Miyoo Mini Flip | $101-107 | $101 (used) | **$114.95** | Competitive, local stock |
+| Trimui Smart Pro 64GB | $139-241 | $139 (cnxiaocao $89.99) | **$159.95** | Competitive, local stock |
+
+**Winners** (we're cheaper than global eBay): RG35XX H, RG35XX SP, Miyoo Mini Plus 64GB, Miyoo Mini Plus 128GB
+**Competitive** (similar price but local stock = 3 days vs 3 weeks): RG28XX, RG CubeXX, RG35XX Plus, Trimui Smart Pro
 
 ### Launch Inventory (10 units, $518 AUD) — Order Before June 30 FY Deadline
 
@@ -261,15 +302,6 @@ AliExpress Summer Sale runs **June 1-10, 2026**. Discount codes:
 - `RHH8` — $8 off $60+
 - `RHH14` — $14 off $89+
 - Stack with PayPal savings and Rakuten 20% cashback for deeper discounts.
-
-### Expansion Catalog (add as sales compound)
-
-| Product | AliExpress Sale Price | AUD Cost | Sell Price |
-|---------|----------------------|----------|------------|
-| RG35XX Plus 64GB (ships from AU!) | $51.22 (official $49.99) | ~$77 | $109.95 |
-| Miyoo Mini Plus 128GB | $50.89 (code: MIYOO7YEARS) | ~$78 | $119.95 |
-| Miyoo Mini Flip | $48.40 (code: RHH8) | ~$74 | $114.95 |
-| Trimui Smart Pro 64GB | $77.22 (code: RHH14) / $69.99 official | ~$107 | $159.95 |
 
 ### Scale Targets
 
